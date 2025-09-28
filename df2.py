@@ -1,43 +1,10 @@
-"""Minimal programmatic DeepFilterNet2 interface (noise mixing removed).
-
-This module exposes a single function `denoise_file` that:
-  * Lazily loads the DeepFilterNet2 model (once per process)
-  * Loads an input waveform from disk
-  * Resamples to model sample rate if necessary (handled by df.load_audio)
-  * Enhances (denoises) the audio
-  * Applies an optional short fade‑in to avoid clicks
-  * Resamples back to the original sampling rate
-  * Saves the enhanced audio to the provided output path
-
-Only required repository artifacts:
-  - ./DeepFilterNet2/config.ini
-  - ./DeepFilterNet2/checkpoints/model_*.ckpt.best
-
-Dependencies: torch, df (DeepFilterNet), torchaudio (indirect via df), loguru
-
-Example:
-    from df2_function import denoise_file
-    denoise_file("input.wav", "enhanced.wav")
-
-Return value: a dict with keys:
-    {
-        'input_path': str,
-        'enhanced_path': str,
-        'original_sample_rate': int,
-        'model_sample_rate': int,
-        'tensor': Tensor (only if return_tensor=True)
-    }
-"""
 
 from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Union
-
 import torch
 from loguru import logger
-
 from df import config as df_config
 from df.enhance import enhance, init_df, load_audio, save_audio
 from df.io import resample
@@ -407,7 +374,7 @@ __all__.append("denoise")
 
 # === Example 1: File Mode (single offline file) ===
 # if __name__ == "__main__":
-#     input_wav = r"C:\\Users\\User_1\\Desktop\\noisy_audio_files\\noisy_fish.wav"  # replace with your path
+#     input_wav = r"C:\Users\User_1\Desktop\noisy_auido_files\noisy_fish.wav"  # replace with your path
 #     output_wav = r"C:\\Users\\User_1\\Desktop\\output_file_mode.wav"
 #     result = denoise(
 #         input_mode="file",
@@ -419,18 +386,19 @@ __all__.append("denoise")
 #     )
 #     print("[FILE MODE] Enhanced file:", result["enhanced_path"], "SR:", result["original_sample_rate"])  
 
+
 # === Example 2: Streaming Mode (microphone capture) ===
-if __name__ == "__main__":
-    output_stream_wav = r"C:\\Users\\User_1\\Desktop\\output_stream_mode.wav"
-    result_stream = denoise(
-        input_mode="streaming",
-        output_path=output_stream_wav,
-        streaming_duration=None,    # capture 20 seconds (None = until Ctrl+C)
-        chunk_seconds=6.0,        # larger chunk for better quality (higher latency)
-        overlap_seconds=0.5,      # smooth crossfade
-        playback=True,            # set False to disable live playback
-        fade_in_seconds=0.15,
-        return_tensor=False,
-    )
-    print("[STREAMING MODE] Enhanced file:", result_stream["enhanced_path"],
-          "Duration:", result_stream["stream_duration_seconds"], "s", "Chunks:", result_stream["chunks"]) 
+# if __name__ == "__main__":
+#     output_stream_wav = r"C:\\Users\\User_1\\Desktop\\output_stream_mode.wav"
+#     result_stream = denoise(
+#         input_mode="streaming",
+#         output_path=output_stream_wav,
+#         streaming_duration=None,    # capture 20 seconds (None = until Ctrl+C)
+#         chunk_seconds=6.0,        # larger chunk for better quality (higher latency)
+#         overlap_seconds=0.5,      # smooth crossfade
+#         playback=True,            # set False to disable live playback
+#         fade_in_seconds=0.15,
+#         return_tensor=False,
+#     )
+#     print("[STREAMING MODE] Enhanced file:", result_stream["enhanced_path"],
+#           "Duration:", result_stream["stream_duration_seconds"], "s", "Chunks:", result_stream["chunks"]) 
