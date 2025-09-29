@@ -3,8 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Union
+from queue import Empty, Full, Queue
+
+import numpy as np
 import torch
 from loguru import logger
+
 from df import config as df_config
 from df.enhance import enhance, init_df, load_audio, save_audio
 from df.io import resample
@@ -233,9 +237,6 @@ def denoise(
 
     enhanced_segments = []  # list[Tensor]
     total_captured = 0.0
-    start_time = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
-    if start_time is not None:
-        start_time.record()
 
     ramp_up = None
     ramp_down = None
@@ -244,6 +245,29 @@ def denoise(
         ramp_down = torch.linspace(1.0, 0.0, overlap_frames)
 
     previous_tail = None  # Tensor of shape [1, overlap_frames]
+
+    audio_queue: Queue[np.ndarray] = Queue(maxsize=8)
+    stream_error: Optional[Exception] = None
+
+    def _input_callback(indata, frames, time_info, status):  # pragma: no cover - callback
+        nonlocal stream_error
+        if status:
+            logger.warning(f"Input stream status: {status}")
+        try:
+            audio_queue.put_nowait(indata[:, 0].copy())
+        except Full:
+            logger.warning("Input queue full; dropping chunk")
+        except Exception as exc:  # pragma: no cover
+            stream_error = exc
+
+    def _next_chunk(timeout: float = 1.0) -> np.ndarray:
+        while True:
+            if stream_error is not None:
+                raise stream_error
+            try:
+                return audio_queue.get(timeout=timeout)
+            except Empty:
+                continue
 
     def _process_chunk(raw_chunk: torch.Tensor) -> torch.Tensor:
         # raw_chunk shape [samples] or [1, samples]
@@ -294,44 +318,55 @@ def denoise(
         except Exception as pe:  # pragma: no cover
             logger.warning(f"Playback failed: {pe}")
 
-    # Main capture loop
-    elapsed = 0.0
+    target_frames = int(streaming_duration * model_sr) if streaming_duration is not None else None
+    total_output_frames = 0
+    captured_frames = 0
+    processed_chunks = 0
+
     try:
-        while True:
-            if streaming_duration is not None and elapsed >= streaming_duration:
-                break
-            # Record one chunk (blocking)
-            rec = sd.rec(frames=chunk_frames, samplerate=model_sr, channels=1, dtype="float32")
-            sd.wait()
-            raw = torch.from_numpy(rec.squeeze())  # shape [T]
+        with sd.InputStream(
+            samplerate=model_sr,
+            channels=1,
+            dtype="float32",
+            blocksize=chunk_frames,
+            callback=_input_callback,
+        ):
+            while True:
+                if target_frames is not None and captured_frames >= target_frames:
+                    break
 
-            enhanced_chunk = _process_chunk(raw)
+                chunk_np = _next_chunk()
+                raw = torch.from_numpy(np.asarray(chunk_np, dtype=np.float32))  # shape [T]
 
-            # Crossfade with previous tail if requested
-            if previous_tail is not None and overlap_frames > 0:
-                head = enhanced_chunk[:, :overlap_frames]
-                cf = previous_tail * ramp_down + head * ramp_up  # shape [1, overlap_frames]
-                # Replace the last segment's tail: we appended full previous tail already; so append crossfaded portion + remainder
-                # To avoid duplication, we drop the last overlap_frames from the previous appended segment
-                if enhanced_segments:
-                    enhanced_segments[-1] = torch.cat(
-                        [enhanced_segments[-1][:, :-overlap_frames], cf], dim=1
-                    )
-                # Append remainder after head
-                remainder = enhanced_chunk[:, overlap_frames:]
-                if remainder.numel() > 0:
-                    enhanced_segments.append(remainder)
-                play_chunk = torch.cat([cf, remainder], dim=1)
-            else:
-                enhanced_segments.append(enhanced_chunk)
-                play_chunk = enhanced_chunk
+                enhanced_chunk = _process_chunk(raw)
 
-            previous_tail = enhanced_chunk[:, -overlap_frames:] if overlap_frames > 0 else None
+                captured_frames += raw.shape[-1]
+                processed_chunks += 1
 
-            _play(play_chunk)
+                # Crossfade with previous tail if requested
+                if previous_tail is not None and overlap_frames > 0:
+                    head = enhanced_chunk[:, :overlap_frames]
+                    cf = previous_tail * ramp_down + head * ramp_up  # shape [1, overlap_frames]
 
-            elapsed += chunk_seconds
-            total_captured = elapsed
+                    enhanced_segments.append(cf)
+                    total_output_frames += cf.shape[-1]
+
+                    remainder = enhanced_chunk[:, overlap_frames:]
+                    if remainder.numel() > 0:
+                        enhanced_segments.append(remainder)
+                        total_output_frames += remainder.shape[-1]
+
+                    play_chunk = torch.cat([cf, remainder], dim=1)
+                else:
+                    enhanced_segments.append(enhanced_chunk)
+                    total_output_frames += enhanced_chunk.shape[-1]
+                    play_chunk = enhanced_chunk
+
+                previous_tail = enhanced_chunk[:, -overlap_frames:] if overlap_frames > 0 else None
+
+                total_captured = captured_frames / model_sr
+
+                _play(play_chunk)
     except KeyboardInterrupt:  # pragma: no cover
         logger.info("Streaming interrupted by user; finalizing...")
 
@@ -339,6 +374,20 @@ def denoise(
     if not enhanced_segments:
         raise RuntimeError("No audio captured in streaming mode")
     final_enhanced = torch.cat(enhanced_segments, dim=1)
+
+    # Ensure output duration matches captured microphone frames
+    if final_enhanced.shape[-1] > captured_frames > 0:
+        final_enhanced = final_enhanced[:, :captured_frames]
+        total_output_frames = captured_frames
+    elif captured_frames > final_enhanced.shape[-1]:
+        pad = captured_frames - final_enhanced.shape[-1]
+        pad_values = final_enhanced[:, -1:].repeat(1, pad)
+        final_enhanced = torch.cat([final_enhanced, pad_values], dim=1)
+        total_output_frames = captured_frames
+    else:
+        total_output_frames = final_enhanced.shape[-1]
+
+    total_captured = total_output_frames / model_sr
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -358,7 +407,7 @@ def denoise(
         "original_sample_rate": model_sr,
         "model_sample_rate": model_sr,
         "stream_duration_seconds": int(total_captured),
-        "chunks": len(enhanced_segments),
+        "chunks": processed_chunks,
     }
     if return_tensor:
         result["tensor"] = final_enhanced
