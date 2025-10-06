@@ -19,7 +19,7 @@ MODEL_DIR = Path("./DeepFilterNet2")
 @dataclass
 class _ModelBundle:
     model: torch.nn.Module
-    df_state: object  # internal DeepFilterNet state object
+    df_state: object  # internal DeepFi-terNet state object
     device: torch.device
 
 
