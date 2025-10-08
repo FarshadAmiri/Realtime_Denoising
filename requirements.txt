@@ -1,5 +1,22 @@
+# Deep learning and audio processing
 torch==2.3.1+cu121
 torchaudio==2.3.1+cu121
 deepfilternet==0.5.6
 matplotlib==3.9.1
 Pillow==10.4.0
+
+# Django and web framework
+Django>=4.2,<5.0
+djangorestframework>=3.14.0
+channels>=4.0.0
+channels-redis>=4.1.0
+daphne>=4.0.0
+
+# WebRTC and media
+aiortc>=1.5.0
+av>=10.0.0
+
+# Additional utilities
+redis>=5.0.0
+loguru>=0.7.0
+numpy>=1.24.0
