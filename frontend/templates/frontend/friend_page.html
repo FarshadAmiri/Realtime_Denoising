@@ -1,0 +1,49 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{{ friend.username }} - Audio Streaming{% endblock %}
+
+{% block content %}
+<div class="friend-page">
+    <div class="friend-header">
+        <h1>{{ friend.username }}'s Page</h1>
+        <a href="{% url 'frontend:main' %}" class="btn btn-secondary">Back to Home</a>
+    </div>
+    
+    <!-- Live stream section (top) -->
+    <div class="live-stream-section">
+        <h2>Live Stream</h2>
+        <div id="stream-status" class="stream-status">
+            Checking stream status...
+        </div>
+        
+        <div id="live-player-container" style="display:none;">
+            <div class="live-badge">🔴 LIVE</div>
+            <audio id="live-audio" controls autoplay></audio>
+            <button id="listen-btn" class="btn btn-primary">Start Listening</button>
+            <button id="stop-listen-btn" class="btn btn-danger" style="display:none;">Stop Listening</button>
+        </div>
+        
+        <div id="not-streaming-message" style="display:none;">
+            <p>{{ friend.username }} is not currently streaming.</p>
+        </div>
+    </div>
+    
+    <!-- Recordings section (bottom) -->
+    <div class="recordings-section">
+        <h2>Previous Recordings</h2>
+        <div id="recordings-list" class="recordings-list">
+            <p>Loading recordings...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const friendUsername = "{{ friend.username }}";
+const currentUsername = "{{ user.username }}";
+const csrfToken = "{{ csrf_token }}";
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/friend_page.js' %}"></script>
+{% endblock %}
