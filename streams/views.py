@@ -9,11 +9,14 @@ from rest_framework.response import Response
 from rest_framework import status
 import json
 import asyncio
+import logging
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from .models import StreamRecording, ActiveStream
 from .webrtc_handler import create_session, get_session, get_session_by_username, close_session
+
+logger = logging.getLogger(__name__)
 from users.models import User, Friendship
 
 
@@ -33,6 +36,7 @@ def start_stream(request):
     
     # Create new session
     session = create_session(user.username)
+    logger.info(f"Created streaming session {session.session_id} for user {user.username}")
     
     # Update user streaming status
     user.is_streaming = True
@@ -70,35 +74,33 @@ def stop_stream(request):
     # Get active stream
     try:
         active_stream = ActiveStream.objects.get(user=user)
-        session_id = active_stream.session_id
-        
-        # Close WebRTC session
-        asyncio.run(close_session(session_id))
-        
-        # Delete active stream record
-        active_stream.delete()
-        
-        # Update user streaming status
-        user.is_streaming = False
-        user.save()
-        
-        # Notify friends
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            "presence",
-            {
-                'type': 'streaming_status_update',
-                'username': user.username,
-                'is_streaming': False
-            }
-        )
-        
-        return Response({'message': 'Stream stopped'})
     except ActiveStream.DoesNotExist:
-        return Response(
-            {'error': 'No active stream'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'error': 'No active stream'}, status=status.HTTP_400_BAD_REQUEST)
+
+    session_id = active_stream.session_id
+    # Close WebRTC session (async->sync)
+    async_to_sync(close_session)(session_id)
+    logger.info(f"Closed streaming session {session_id} for user {user.username}")
+
+    # Delete active stream record
+    active_stream.delete()
+
+    # Update user streaming status
+    user.is_streaming = False
+    user.save()
+
+    # Notify friends
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "presence",
+        {
+            'type': 'streaming_status_update',
+            'username': user.username,
+            'is_streaming': False
+        }
+    )
+
+    return Response({'message': 'Stream stopped'})
 
 
 @api_view(['POST'])
@@ -107,6 +109,15 @@ def webrtc_offer(request):
     """Handle WebRTC offer from broadcaster."""
     user = request.user
     offer_sdp = request.data.get('sdp')
+
+    # Early dependency check for clearer error
+    try:
+        import aiortc  # noqa: F401
+    except ImportError:
+        return Response(
+            {'error': 'WebRTC dependency aiortc is not installed. Install it with: pip install --upgrade pip setuptools wheel && pip install av aiortc'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     
     if not offer_sdp:
         return Response(
@@ -124,17 +135,17 @@ def webrtc_offer(request):
     
     # Handle offer asynchronously
     try:
-        answer_sdp = asyncio.run(session.handle_offer(offer_sdp))
+        logger.info(f"Handling broadcaster WebRTC offer for user {user.username} session {session.session_id}")
+        answer_sdp = async_to_sync(session.handle_offer)(offer_sdp)
+        logger.info(f"Generated WebRTC answer for user {user.username} session {session.session_id}")
         return Response({
             'sdp': answer_sdp,
             'type': 'answer',
             'session_id': session.session_id
         })
     except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.exception("Error handling broadcaster offer")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -143,6 +154,15 @@ def listener_offer(request, username):
     """Handle WebRTC offer from a listener wanting to hear a stream."""
     user = request.user
     offer_sdp = request.data.get('sdp')
+
+    # Early dependency check for clearer error
+    try:
+        import aiortc  # noqa: F401
+    except ImportError:
+        return Response(
+            {'error': 'WebRTC dependency aiortc is not installed. Install it with: pip install --upgrade pip setuptools wheel && pip install av aiortc'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     
     if not offer_sdp:
         return Response(
@@ -183,16 +203,13 @@ def listener_offer(request, username):
     # Create listener connection
     try:
         listener_id = f"{user.username}_{user.id}"
-        answer_sdp = asyncio.run(session.create_listener_connection(listener_id, offer_sdp))
-        return Response({
-            'sdp': answer_sdp,
-            'type': 'answer'
-        })
+        logger.info(f"Creating listener connection listener_id={listener_id} to streamer={username}")
+        answer_sdp = async_to_sync(session.create_listener_connection)(listener_id, offer_sdp)
+        logger.info(f"Listener {listener_id} connected to streamer {username}")
+        return Response({'sdp': answer_sdp, 'type': 'answer'})
     except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.exception("Error creating listener connection")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -249,3 +266,21 @@ def stream_status(request, username):
             {'error': 'User not found'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def stream_debug(request, username):
+    """Debug endpoint: expose internal session readiness & listener count."""
+    from .webrtc_handler import get_session_by_username
+    session = get_session_by_username(username)
+    if not session:
+        return Response({'active': False})
+    return Response({
+        'active': True,
+        'session_id': session.session_id,
+        'ready': session.ready.is_set(),
+        'has_processed_track': session.processed_track is not None,
+        'listeners': list(session.listeners.keys()),
+        'recording_path': str(session.recording_path) if session.recording_path else None,
+    })

@@ -72,6 +72,12 @@ async function startListening() {
         
     } catch (error) {
         console.error('Error starting listening:', error);
+        // Retry automatically if stream not yet ready
+        if (/Stream not yet ready|processed audio track not initialized/i.test(error.message)) {
+            console.log('Retrying listener in 2s...');
+            setTimeout(startListening, 2000);
+            return;
+        }
         alert('Failed to start listening: ' + error.message);
     }
 }

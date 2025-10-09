@@ -5,6 +5,7 @@
 let webrtcClient = null;
 let presenceSocket = null;
 let isStreaming = false;
+let streamingIndicatorEl = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,12 +13,28 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFriends();
     loadFriendRequests();
     setupEventListeners();
+    // Poll own status in case page refreshed while streaming
+    setInterval(syncOwnStreamingStatus, 8000);
 });
 
 function setupEventListeners() {
     const startBtn = document.getElementById('start-stream-btn');
     const stopBtn = document.getElementById('stop-stream-btn');
     const searchInput = document.getElementById('search-input');
+
+    // Create/locate streaming indicator
+    streamingIndicatorEl = document.getElementById('streaming-indicator');
+    if (!streamingIndicatorEl) {
+        const header = document.querySelector('.sidebar-header');
+        if (header) {
+            streamingIndicatorEl = document.createElement('div');
+            streamingIndicatorEl.id = 'streaming-indicator';
+            streamingIndicatorEl.style.display = 'none';
+            streamingIndicatorEl.className = 'streaming-indicator';
+            streamingIndicatorEl.innerHTML = '<span class="dot"></span> Streaming now';
+            header.appendChild(streamingIndicatorEl);
+        }
+    }
 
     startBtn.addEventListener('click', startStreaming);
     stopBtn.addEventListener('click', stopStreaming);
@@ -112,6 +129,30 @@ function updateFriendStatus(username, isStreaming) {
         statusElement.textContent = isStreaming ? 'Streaming' : 'Offline';
         statusElement.classList.toggle('streaming', isStreaming);
     }
+    // If this is the current user, update UI
+    if (username === usernameGlobalSafe()) {
+        if (isStreaming !== isStreamingFlag()) {
+            isStreaming = isStreaming; // keep global
+            updateStreamingUI();
+        }
+    }
+}
+
+function usernameGlobalSafe() { return typeof username !== 'undefined' ? username : null; }
+function isStreamingFlag() { return isStreaming; }
+
+async function syncOwnStreamingStatus() {
+    const me = usernameGlobalSafe();
+    if (!me) return;
+    try {
+        const resp = await fetch(`/api/stream/status/${me}/`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (typeof data.is_streaming === 'boolean' && data.is_streaming !== isStreaming) {
+            isStreaming = data.is_streaming;
+            updateStreamingUI();
+        }
+    } catch (e) { /* ignore transient */ }
 }
 
 function goToFriendPage(username) {
@@ -236,7 +277,8 @@ async function respondToRequest(requestId, action) {
 
 async function startStreaming() {
     try {
-        // Start stream on server
+        console.log('[Streaming] Initiating start');
+        // 1. Tell backend to mark stream active (session created)
         const response = await fetch('/api/stream/start/', {
             method: 'POST',
             headers: {
@@ -244,26 +286,33 @@ async function startStreaming() {
                 'X-CSRFToken': csrfToken
             }
         });
-        
         const data = await response.json();
-        
         if (!response.ok) {
             throw new Error(data.error || 'Failed to start stream');
         }
-        
-        // Start WebRTC broadcast
+
+        // 2. Optimistic UI update (so user sees immediate feedback)
+        isStreaming = true;
+        updateStreamingUI();
+
+        // 3. Start WebRTC broadcast (might still fail; handle rollback)
         webrtcClient = new WebRTCClient();
         await webrtcClient.startBroadcast();
+        console.log('[Streaming] WebRTC broadcast established');
         
-        isStreaming = true;
-        document.getElementById('start-stream-btn').style.display = 'none';
-        document.getElementById('stop-stream-btn').style.display = 'block';
-        
-        alert('Streaming started! Your friends can now listen to your audio.');
+        // 4. Optionally force refresh of own status display
+        syncOwnStreamingStatus();
         
     } catch (error) {
         console.error('Error starting stream:', error);
         alert('Failed to start streaming: ' + error.message);
+        // Rollback UI if we set streaming optimistically
+        if (isStreaming) {
+            isStreaming = false;
+            updateStreamingUI();
+        }
+        // Inform backend if session was created but we failed after (best effort)
+        try { if (webrtcClient) { webrtcClient.stopBroadcast(); } } catch (_) {}
     }
 }
 
@@ -289,14 +338,27 @@ async function stopStreaming() {
             console.error('Error stopping stream:', data.error);
         }
         
-        isStreaming = false;
-        document.getElementById('start-stream-btn').style.display = 'block';
-        document.getElementById('stop-stream-btn').style.display = 'none';
-        
-        alert('Streaming stopped.');
+    isStreaming = false;
+    updateStreamingUI();
+    console.log('Streaming stopped');
         
     } catch (error) {
         console.error('Error stopping stream:', error);
         alert('Failed to stop streaming: ' + error.message);
+    }
+}
+
+function updateStreamingUI() {
+    const startBtn = document.getElementById('start-stream-btn');
+    const stopBtn = document.getElementById('stop-stream-btn');
+    if (!startBtn || !stopBtn) return;
+    if (isStreaming) {
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'block';
+        if (streamingIndicatorEl) streamingIndicatorEl.style.display = 'block';
+    } else {
+        startBtn.style.display = 'block';
+        stopBtn.style.display = 'none';
+        if (streamingIndicatorEl) streamingIndicatorEl.style.display = 'none';
     }
 }

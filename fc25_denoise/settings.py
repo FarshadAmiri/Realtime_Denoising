@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -76,14 +77,29 @@ WSGI_APPLICATION = 'fc25_denoise.wsgi.application'
 ASGI_APPLICATION = 'fc25_denoise.asgi.application'
 
 # Channels configuration
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
+# Allow overriding via environment variables and providing an in-memory fallback for simple dev use.
+#   CHANNEL_BACKEND=inmemory  -> use channels.layers.InMemoryChannelLayer (single-process only)
+#   REDIS_HOST / REDIS_PORT   -> override Redis location (default 127.0.0.1:6379)
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
+CHANNEL_BACKEND = os.environ.get("CHANNEL_BACKEND", "redis").lower()
+
+if CHANNEL_BACKEND == "inmemory":
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [(REDIS_HOST, REDIS_PORT)],
+            },
         },
-    },
-}
+    }
 
 
 # Database

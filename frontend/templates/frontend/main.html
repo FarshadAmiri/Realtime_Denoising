@@ -1,4 +1,5 @@
 {% extends 'frontend/base.html' %}
+{% load static %}
 
 {% block title %}Home - Audio Streaming{% endblock %}
 
@@ -10,6 +11,9 @@
             <h2>Welcome, {{ user.username }}</h2>
             <button id="start-stream-btn" class="btn btn-primary">Start Streaming</button>
             <button id="stop-stream-btn" class="btn btn-danger" style="display:none;">Stop Streaming</button>
+            <div id="streaming-indicator" class="streaming-indicator" style="display:none;">
+                <span class="dot"></span> Streaming now
+            </div>
         </div>
         
         <div class="friends-section">

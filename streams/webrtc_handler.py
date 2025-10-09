@@ -1,81 +1,33 @@
-"""
-WebRTC handling with aiortc for real-time audio streaming and processing.
+"""WebRTC handling with aiortc for real-time audio streaming and denoising.
+
+Refactored to:
+ - Consume broadcaster audio once
+ - Process frames through DeepFilterNet
+ - Distribute processed frames to each listener via per-listener queues
+ - Provide a MediaStreamTrack abstraction per listener (no duplicate processing)
+ - Avoid incorrect MediaRecorder usage (temporarily disable recording until reimplemented safely)
 """
 import asyncio
 import uuid
 from typing import Dict, Optional
 from pathlib import Path
 from django.conf import settings
+import av
+
+from aiortc import MediaStreamTrack  # type: ignore
 
 
-def _get_track_class():
-    """Lazy load MediaStreamTrack to avoid import at module level."""
-    from aiortc import MediaStreamTrack
-    import av
-    
-    class ProcessedAudioTrack(MediaStreamTrack):
-        """
-        Custom audio track that processes incoming audio through DFN2 denoiser.
-        """
-        kind = "audio"
-        
-        def __init__(self, source_track, processor, recorder=None):
-            super().__init__()
-            self.source = source_track
-            self.processor = processor
-            self.recorder = recorder
-            self.frame_count = 0
-        
-        async def recv(self):
-            """
-            Receive and process audio frames.
-            """
-            try:
-                # Get frame from source
-                frame = await self.source.recv()
-                
-                # Convert AudioFrame to numpy array
-                audio_array = frame.to_ndarray()
-                
-                # Process mono channel (take first channel if stereo)
-                if audio_array.ndim > 1:
-                    audio_mono = audio_array[0]
-                else:
-                    audio_mono = audio_array
-                
-                # Denoise the audio
-                try:
-                    denoised = await self.processor.process_frame(audio_mono)
-                except Exception as e:
-                    print(f"Error processing audio: {e}")
-                    denoised = audio_mono
-                
-                # Convert back to AudioFrame
-                # Ensure proper shape for av.AudioFrame
-                if denoised.ndim == 1:
-                    denoised = denoised.reshape(1, -1)
-                
-                processed_frame = av.AudioFrame.from_ndarray(
-                    denoised,
-                    format='flt',
-                    layout='mono'
-                )
-                processed_frame.sample_rate = frame.sample_rate
-                processed_frame.pts = frame.pts
-                processed_frame.time_base = frame.time_base
-                
-                # Record if recorder is available
-                if self.recorder:
-                    await self.recorder.track(processed_frame)
-                
-                self.frame_count += 1
-                return processed_frame
-                
-            except Exception as e:
-                print(f"Error in ProcessedAudioTrack.recv: {e}")
-                raise
-    
-    return ProcessedAudioTrack
+class ListenerAudioTrack(MediaStreamTrack):
+    """A per-listener track that pulls processed frames from its own queue."""
+    kind = "audio"
+
+    def __init__(self, queue: asyncio.Queue):
+        super().__init__()
+        self._queue = queue
+
+    async def recv(self):
+        frame = await self._queue.get()
+        return frame
 
 
 class WebRTCSession:
@@ -88,10 +40,13 @@ class WebRTCSession:
         self.username = username
         self.pc = None
         self.processor = None
-        self.processed_track = None
-        self.recorder = None
         self.recording_path: Optional[Path] = None
-        self.listeners: Dict[str, any] = {}
+        self.ready = asyncio.Event()
+        # Queues for distributing processed frames to listeners (listener_id -> queue)
+        self.listener_queues: Dict[str, asyncio.Queue] = {}
+        # Track consumption task
+        self._consume_task: Optional[asyncio.Task] = None
+        self._closed = False
     
     async def handle_offer(self, offer_sdp: str) -> str:
         """
@@ -103,62 +58,73 @@ class WebRTCSession:
         Returns:
             SDP answer string
         """
-        # Lazy imports
-        from aiortc import RTCPeerConnection, RTCSessionDescription
-        from aiortc.contrib.media import MediaRecorder
+        # Lazy imports (kept inside to avoid global aiortc dependency at import time)
+        from aiortc import RTCPeerConnection, RTCSessionDescription  # type: ignore
         from .audio_processor import get_processor
-        
+
         self.pc = RTCPeerConnection()
         self.processor = get_processor()
-        ProcessedAudioTrack = _get_track_class()
-        
-        # Set up recording
+        # (Recording path reserved for future implementation)
         self.recording_path = Path(settings.MEDIA_ROOT) / 'recordings' / f"{self.session_id}.wav"
         self.recording_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         @self.pc.on("track")
         async def on_track(track):
-            if track.kind == "audio":
-                print(f"Received audio track from {self.username}")
-                
-                # Create recorder for saving processed audio
-                self.recorder = MediaRecorder(str(self.recording_path))
-                
-                # Create processed track
-                self.processed_track = ProcessedAudioTrack(
-                    track,
-                    self.processor,
-                    self.recorder
-                )
-                
-                # Add to recorder
-                await self.recorder.start()
-                
-                # Consume frames to trigger processing
-                async def consume_frames():
+            if track.kind != "audio":
+                return
+            print(f"Received audio track from {self.username}")
+
+            async def consume():
+                while not self._closed:
                     try:
-                        while True:
-                            await self.processed_track.recv()
+                        frame = await track.recv()
+                        audio_array = frame.to_ndarray()
+                        if audio_array.ndim > 1:
+                            audio_mono = audio_array[0]
+                        else:
+                            audio_mono = audio_array
+                        try:
+                            denoised = await self.processor.process_frame(audio_mono)
+                        except Exception as e:
+                            print(f"Denoise error: {e}")
+                            denoised = audio_mono
+                        if denoised.ndim == 1:
+                            denoised = denoised.reshape(1, -1)
+                        processed_frame = av.AudioFrame.from_ndarray(denoised, format='flt', layout='mono')
+                        processed_frame.sample_rate = frame.sample_rate
+                        processed_frame.time_base = frame.time_base
+                        processed_frame.pts = frame.pts
+                        # Fan-out to listener queues
+                        dead = []
+                        for lid, q in self.listener_queues.items():
+                            try:
+                                if q.qsize() < 5:  # prevent unbounded growth
+                                    q.put_nowait(processed_frame)
+                            except Exception:
+                                dead.append(lid)
+                        for lid in dead:
+                            self.listener_queues.pop(lid, None)
                     except Exception as e:
                         print(f"Frame consumption ended: {e}")
-                
-                asyncio.create_task(consume_frames())
-        
+                        break
+                self.ready.clear()
+
+            if not self._consume_task:
+                self.ready.set()
+                self._consume_task = asyncio.create_task(consume())
+                print(f"Session {self.session_id} ready: processing loop started")
+
         @self.pc.on("connectionstatechange")
         async def on_connectionstatechange():
             print(f"Connection state: {self.pc.connectionState}")
-            if self.pc.connectionState == "failed" or self.pc.connectionState == "closed":
+            if self.pc.connectionState in ("failed", "closed"):
                 await self.close()
-        
-        # Set remote description
-        await self.pc.setRemoteDescription(
-            RTCSessionDescription(sdp=offer_sdp, type="offer")
-        )
-        
-        # Create answer
+
+        # Apply remote offer
+        await self.pc.setRemoteDescription(RTCSessionDescription(sdp=offer_sdp, type="offer"))
+        # Create and set local answer
         answer = await self.pc.createAnswer()
         await self.pc.setLocalDescription(answer)
-        
         return self.pc.localDescription.sdp
     
     async def create_listener_connection(self, listener_id: str, offer_sdp: str) -> str:
@@ -173,55 +139,58 @@ class WebRTCSession:
             SDP answer string
         """
         from aiortc import RTCPeerConnection, RTCSessionDescription
-        
-        if not self.processed_track:
-            raise Exception("No active stream to listen to")
-        
+        import asyncio
+
+        # Wait for readiness (up to 15s)
+        try:
+            await asyncio.wait_for(self.ready.wait(), timeout=15.0)
+        except asyncio.TimeoutError:
+            raise Exception("Stream not yet ready (no audio track received)")
+
         listener_pc = RTCPeerConnection()
-        
-        # Add processed audio track to listener connection
-        listener_pc.addTrack(self.processed_track)
-        
+
+        # Create per-listener queue/track
+        q: asyncio.Queue = asyncio.Queue(maxsize=5)
+        self.listener_queues[listener_id] = q
+        listener_track = ListenerAudioTrack(q)
+
+        listener_pc.addTrack(listener_track)
+
         @listener_pc.on("connectionstatechange")
         async def on_connectionstatechange():
             print(f"Listener {listener_id} state: {listener_pc.connectionState}")
             if listener_pc.connectionState in ["failed", "closed"]:
-                if listener_id in self.listeners:
-                    del self.listeners[listener_id]
-        
+                # Remove its queue to stop feeding frames
+                self.listener_queues.pop(listener_id, None)
+
         # Set remote description
         await listener_pc.setRemoteDescription(
             RTCSessionDescription(sdp=offer_sdp, type="offer")
         )
-        
+
         # Create answer
         answer = await listener_pc.createAnswer()
         await listener_pc.setLocalDescription(answer)
-        
-        self.listeners[listener_id] = listener_pc
-        
         return listener_pc.localDescription.sdp
     
     async def close(self):
         """Close the WebRTC session and cleanup."""
         print(f"Closing session {self.session_id}")
         
-        # Stop recorder
-        if self.recorder:
+        # Stop processing loop
+        self._closed = True
+        if self._consume_task:
+            self._consume_task.cancel()
             try:
-                await self.recorder.stop()
-            except Exception as e:
-                print(f"Error stopping recorder: {e}")
-        
+                await self._consume_task
+            except Exception:
+                pass
+
         # Close main peer connection
         if self.pc:
             await self.pc.close()
-        
-        # Close all listener connections
-        for listener_pc in self.listeners.values():
-            await listener_pc.close()
-        
-        self.listeners.clear()
+        # Clear queues
+        self.listener_queues.clear()
 
 
 # Global session manager
