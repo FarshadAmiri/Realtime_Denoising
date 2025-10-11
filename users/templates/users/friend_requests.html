@@ -1,0 +1,125 @@
+{% extends "core/base.html" %}
+
+{% block title %}Friend Requests - Audio Stream{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="margin-bottom: 2rem;">Friend Requests</h1>
+    
+    <div style="margin-bottom: 3rem;">
+        <h2 style="margin-bottom: 1rem;">Received Requests</h2>
+        {% if received_requests %}
+            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                {% for request in received_requests %}
+                <div style="padding: 1.5rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin-bottom: 0.25rem;">{{ request.from_user.username }}</h3>
+                        <p style="color: #666; font-size: 0.875rem;">{{ request.created_at|date:"M d, Y H:i" }}</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-success" onclick="acceptRequest('{{ request.from_user.username }}')">
+                            Accept
+                        </button>
+                        <button class="btn btn-danger" onclick="rejectRequest('{{ request.from_user.username }}')">
+                            Reject
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <p style="color: #666;">No pending requests</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div>
+        <h2 style="margin-bottom: 1rem;">Sent Requests</h2>
+        {% if sent_requests %}
+            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                {% for request in sent_requests %}
+                <div style="padding: 1.5rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin-bottom: 0.25rem;">{{ request.to_user.username }}</h3>
+                        <p style="color: #666; font-size: 0.875rem;">Sent {{ request.created_at|date:"M d, Y H:i" }}</p>
+                    </div>
+                    <div>
+                        <span style="color: #666;">Pending</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <p style="color: #666;">No sent requests</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+async function acceptRequest(username) {
+    try {
+        const response = await fetch('/api/friends/accept/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ username: username }),
+        });
+        
+        if (response.ok) {
+            alert('Friend request accepted!');
+            location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Failed to accept request'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to accept friend request');
+    }
+}
+
+async function rejectRequest(username) {
+    try {
+        const response = await fetch('/api/friends/reject/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ username: username }),
+        });
+        
+        if (response.ok) {
+            alert('Friend request rejected');
+            location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Failed to reject request'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to reject friend request');
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
