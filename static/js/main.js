@@ -18,8 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFriends();
     loadFriendRequests();
     setupEventListeners();
-    // Poll own status in case page refreshed while streaming
-    setInterval(syncOwnStreamingStatus, 8000);
+    
+    // Check initial status and clean up any stale sessions
+    syncOwnStreamingStatus().then(() => {
+        console.log('[Init] Initial status sync completed');
+        // Only start polling after initial sync
+        setInterval(syncOwnStreamingStatus, 8000);
+    });
     
     // Add beforeunload handler to stop streaming on page close/reload
     window.addEventListener('beforeunload', handlePageUnload);
@@ -224,10 +229,20 @@ async function syncOwnStreamingStatus() {
         const data = await resp.json();
         if (typeof data.is_streaming === 'boolean') {
             const backendStatus = data.is_streaming;
+            console.log(`[Sync] Backend streaming status for ${me}: ${backendStatus}, local: ${isStreaming}, serverStreaming: ${serverStreaming}`);
+            
             if (!backendStatus && (isStreaming || serverStreaming)) {
+                // Backend says not streaming, but we think we are - stop
+                console.log('[Sync] Stopping local stream state (backend says not streaming)');
                 isStreaming = false;
                 serverStreaming = false;
                 stopStreamTimer();
+                updateStreamingUI();
+            } else if (backendStatus && !serverStreaming && !isStreaming) {
+                // Backend says streaming but we don't think so - could be stale session
+                // Only update UI, don't start WebRTC automatically
+                console.log('[Sync] Backend reports streaming but local state is not streaming - updating UI only');
+                serverStreaming = backendStatus;
                 updateStreamingUI();
             } else if (backendStatus !== serverStreaming) {
                 serverStreaming = backendStatus;
