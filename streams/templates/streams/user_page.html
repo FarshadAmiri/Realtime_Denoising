@@ -381,6 +381,9 @@
             
             stopTimer();
             
+            // Calculate duration
+            const duration = startTime ? (Date.now() - startTime) / 1000 : 0;
+            
             // Call API to stop stream
             const response = await fetch('/api/stream/stop/', {
                 method: 'POST',
@@ -388,6 +391,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken'),
                 },
+                body: JSON.stringify({ duration: duration }),
             });
             
             if (!response.ok) {

@@ -55,9 +55,27 @@ def start_stream(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def stop_stream(request):
-    """Stop the current audio stream."""
+    """Stop the current audio stream and save recording."""
     try:
         stream = ActiveStream.objects.get(user=request.user)
+        
+        # Get recording info from request (if any)
+        duration = request.data.get('duration', 0.0)
+        
+        # Create recording entry (file would be uploaded separately in full implementation)
+        from datetime import datetime
+        title = f"Stream {stream.started_at.strftime('%Y-%m-%d %H:%M')}"
+        
+        # Note: In a full implementation, the audio file would be saved by the
+        # AudioProcessor and the path passed here. For now, we create a placeholder.
+        recording = StreamRecording.objects.create(
+            owner=request.user,
+            title=title,
+            duration=duration,
+            denoise_enabled=stream.denoise_enabled,
+        )
+        
+        # Delete active stream
         stream.delete()
         
         # Broadcast presence update
@@ -71,7 +89,10 @@ def stop_stream(request):
             }
         )
         
-        return Response({'status': 'stopped'})
+        return Response({
+            'status': 'stopped',
+            'recording_id': recording.id,
+        })
     except ActiveStream.DoesNotExist:
         return Response({'error': 'No active stream'}, status=400)
 
@@ -96,6 +117,34 @@ def stream_status(request, username):
             return Response({'is_streaming': False})
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=404)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_audio_chunk(request):
+    """
+    Save audio chunk data (for WebRTC streaming).
+    
+    In a full implementation, this would receive audio data from the broadcaster,
+    process it through AudioProcessor, and fan out to listeners.
+    """
+    try:
+        session_id = request.data.get('session_id')
+        audio_data = request.data.get('audio_data')  # Base64 encoded audio
+        
+        # Verify user has active stream
+        stream = ActiveStream.objects.get(user=request.user, session_id=session_id)
+        
+        # In full implementation:
+        # 1. Decode audio data
+        # 2. Process through AudioProcessor
+        # 3. Fan out to listeners via WebSocket
+        # 4. Store in recording buffer
+        
+        return Response({'status': 'received'})
+        
+    except ActiveStream.DoesNotExist:
+        return Response({'error': 'No active stream'}, status=400)
 
 
 @api_view(['GET'])
