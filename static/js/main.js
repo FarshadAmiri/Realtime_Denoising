@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     // Poll own status in case page refreshed while streaming
     setInterval(syncOwnStreamingStatus, 8000);
+    
+    // Add beforeunload handler to stop streaming on page close/reload
+    window.addEventListener('beforeunload', handlePageUnload);
 });
 
 function setupEventListeners() {
@@ -109,8 +112,17 @@ async function loadFriends() {
 }
 
 function startStreamTimer() {
-    if (!streamDurationEl) return;
+    // Ensure we have the element reference
+    if (!streamDurationEl) {
+        streamDurationEl = document.getElementById('stream-duration');
+    }
+    if (!streamDurationEl) {
+        console.error('stream-duration element not found!');
+        return;
+    }
+    
     streamStartedAt = Date.now();
+    console.log('[Timer] Starting stream timer at', new Date(streamStartedAt).toISOString());
     updateStreamDuration();
     if (streamTimerInterval) {
         clearInterval(streamTimerInterval);
@@ -119,9 +131,16 @@ function startStreamTimer() {
 }
 
 function updateStreamDuration() {
-    if (!streamDurationEl || streamStartedAt === null) return;
+    if (!streamDurationEl) {
+        streamDurationEl = document.getElementById('stream-duration');
+    }
+    if (!streamDurationEl || streamStartedAt === null) {
+        return;
+    }
     const elapsedSeconds = Math.max(0, Math.floor((Date.now() - streamStartedAt) / 1000));
-    streamDurationEl.textContent = formatDuration(elapsedSeconds);
+    const formattedTime = formatDuration(elapsedSeconds);
+    streamDurationEl.textContent = formattedTime;
+    console.log(`[Timer] Updated duration: ${formattedTime} (${elapsedSeconds}s)`);
 }
 
 function stopStreamTimer() {
@@ -425,6 +444,36 @@ async function stopStreaming() {
     } catch (error) {
         console.error('Error stopping stream:', error);
         alert('Failed to stop streaming: ' + error.message);
+    }
+}
+
+function handlePageUnload(event) {
+    // Stop streaming if active when user navigates away or closes page
+    if (isStreaming || serverStreaming) {
+        // Use navigator.sendBeacon for reliable async request during unload
+        const stopUrl = '/api/stream/stop/';
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        
+        // Try sendBeacon first (best for unload events)
+        const beaconSent = navigator.sendBeacon(stopUrl, formData);
+        
+        if (!beaconSent) {
+            // Fallback: synchronous XHR (works but not recommended)
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', stopUrl, false); // false = synchronous
+            xhr.setRequestHeader('X-CSRFToken', csrfToken);
+            try {
+                xhr.send(formData);
+            } catch (e) {
+                console.error('Failed to stop stream on unload:', e);
+            }
+        }
+        
+        // Clean up WebRTC locally
+        if (webrtcClient) {
+            webrtcClient.stopBroadcast();
+        }
     }
 }
 

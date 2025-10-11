@@ -33,11 +33,55 @@ class PresenceConsumer(AsyncWebsocketConsumer):
         }))
     
     async def disconnect(self, close_code):
+        # Clean up streaming session if user disconnects
+        if hasattr(self, 'user') and self.user.is_authenticated:
+            await self.cleanup_user_stream()
+        
         if hasattr(self, 'presence_group'):
             await self.channel_layer.group_discard(
                 self.presence_group,
                 self.channel_name
             )
+    
+    @database_sync_to_async
+    def cleanup_user_stream(self):
+        """Stop streaming session when user disconnects."""
+        from .webrtc_handler import get_session_by_username, close_session
+        from .models import ActiveStream
+        from asgiref.sync import async_to_sync
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # Check if user has an active stream
+        try:
+            active_stream = ActiveStream.objects.get(user=self.user)
+            session_id = active_stream.session_id
+            
+            # Close WebRTC session
+            async_to_sync(close_session)(session_id)
+            logger.info(f"Closed streaming session {session_id} for disconnected user {self.user.username}")
+            
+            # Delete active stream record
+            active_stream.delete()
+            
+            # Update user streaming status
+            self.user.is_streaming = False
+            self.user.save()
+            
+            # Notify friends via WebSocket
+            from channels.layers import get_channel_layer
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "presence",
+                {
+                    'type': 'streaming_status_update',
+                    'username': self.user.username,
+                    'is_streaming': False
+                }
+            )
+        except ActiveStream.DoesNotExist:
+            pass  # No active stream to clean up
     
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -48,11 +92,16 @@ class PresenceConsumer(AsyncWebsocketConsumer):
     
     async def streaming_status_update(self, event):
         """Receive streaming status updates from group."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"PresenceConsumer received streaming_status_update: {event['username']} is_streaming={event['is_streaming']}")
+        
         await self.send(text_data=json.dumps({
             'type': 'streaming_status',
             'username': event['username'],
             'is_streaming': event['is_streaming']
         }))
+        logger.info(f"Sent streaming_status to WebSocket client for {event['username']}")
     
     @database_sync_to_async
     def get_friends_status(self):
