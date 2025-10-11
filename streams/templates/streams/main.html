@@ -1,0 +1,211 @@
+{% extends "core/base.html" %}
+
+{% block title %}Home - Audio Stream{% endblock %}
+
+{% block extra_css %}
+<style>
+    .main-layout {
+        display: flex;
+        gap: 2rem;
+        height: calc(100vh - 160px);
+    }
+    
+    .friends-sidebar {
+        width: 300px;
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow-y: auto;
+    }
+    
+    .friends-sidebar h2 {
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+    }
+    
+    .friend-item {
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+    
+    .friend-item:hover {
+        background: #e9ecef;
+    }
+    
+    .friend-item.active {
+        border-color: #3498db;
+        background: #e3f2fd;
+    }
+    
+    .friend-name {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .friend-status {
+        font-size: 0.875rem;
+        color: #666;
+    }
+    
+    .friend-status.streaming {
+        color: #27ae60;
+        font-weight: 600;
+    }
+    
+    .live-badge {
+        display: inline-block;
+        background: #e74c3c;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    .main-content {
+        flex: 1;
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow-y: auto;
+    }
+    
+    .welcome-message {
+        text-align: center;
+        color: #666;
+        margin-top: 4rem;
+    }
+    
+    .no-friends {
+        text-align: center;
+        color: #666;
+        padding: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-layout">
+    <div class="friends-sidebar">
+        <h2>Friends</h2>
+        {% if friends %}
+            <div id="friends-list">
+                {% for friend in friends %}
+                <div class="friend-item" data-username="{{ friend.username }}" onclick="selectFriend('{{ friend.username }}')">
+                    <div class="friend-name">{{ friend.username }}</div>
+                    <div class="friend-status {% if friend.is_streaming %}streaming{% endif %}">
+                        {% if friend.is_streaming %}
+                            <span class="live-badge">LIVE</span> Streaming
+                        {% else %}
+                            Offline
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-friends">
+                <p>No friends yet!</p>
+                <p style="margin-top: 1rem;"><a href="{% url 'search_users' %}" class="btn btn-primary">Find Friends</a></p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="main-content">
+        <div id="user-content">
+            <div class="welcome-message">
+                <h2>Welcome, {{ user.username }}!</h2>
+                <p style="margin-top: 1rem;">Select a friend from the sidebar to view their stream and recordings.</p>
+                <p style="margin-top: 2rem;">
+                    <a href="{% url 'user_page' user.username %}" class="btn btn-primary">Go to My Page</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // WebSocket for presence updates
+    let presenceSocket = null;
+    
+    function connectPresence() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        presenceSocket = new WebSocket(protocol + '//' + window.location.host + '/ws/presence/');
+        
+        presenceSocket.onopen = function() {
+            console.log('Presence WebSocket connected');
+        };
+        
+        presenceSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            
+            if (data.type === 'streaming_status_update') {
+                updateFriendStatus(data.username, data.is_streaming);
+            } else if (data.type === 'all_statuses') {
+                updateAllStatuses(data.streaming_users);
+            }
+        };
+        
+        presenceSocket.onerror = function(e) {
+            console.error('Presence WebSocket error:', e);
+        };
+        
+        presenceSocket.onclose = function() {
+            console.log('Presence WebSocket closed, reconnecting...');
+            setTimeout(connectPresence, 3000);
+        };
+    }
+    
+    function updateFriendStatus(username, isStreaming) {
+        const friendItem = document.querySelector(`[data-username="${username}"]`);
+        if (!friendItem) return;
+        
+        const statusDiv = friendItem.querySelector('.friend-status');
+        if (isStreaming) {
+            statusDiv.className = 'friend-status streaming';
+            statusDiv.innerHTML = '<span class="live-badge">LIVE</span> Streaming';
+        } else {
+            statusDiv.className = 'friend-status';
+            statusDiv.innerHTML = 'Offline';
+        }
+    }
+    
+    function updateAllStatuses(streamingUsers) {
+        const friendItems = document.querySelectorAll('.friend-item');
+        friendItems.forEach(item => {
+            const username = item.dataset.username;
+            const isStreaming = streamingUsers.includes(username);
+            updateFriendStatus(username, isStreaming);
+        });
+    }
+    
+    function selectFriend(username) {
+        // Mark as active
+        document.querySelectorAll('.friend-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        document.querySelector(`[data-username="${username}"]`).classList.add('active');
+        
+        // Load friend's page
+        window.location.href = '/user/' + username + '/';
+    }
+    
+    // Connect on page load
+    connectPresence();
+</script>
+{% endblock %}

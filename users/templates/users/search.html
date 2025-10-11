@@ -1,0 +1,87 @@
+{% extends "core/base.html" %}
+
+{% block title %}Search Users - Audio Stream{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="margin-bottom: 2rem;">Find Friends</h1>
+    
+    <form method="get" style="margin-bottom: 2rem;">
+        <div style="display: flex; gap: 1rem;">
+            <input type="text" name="q" value="{{ query }}" placeholder="Search by username..." 
+                   style="flex: 1; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem;">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+    
+    {% if results %}
+        <div style="background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            {% for result in results %}
+            <div style="padding: 1.5rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="margin-bottom: 0.25rem;">{{ result.username }}</h3>
+                </div>
+                <div>
+                    {% if result.friendship_status == 'none' %}
+                        <button class="btn btn-primary" onclick="sendFriendRequest('{{ result.username }}')">
+                            Add Friend
+                        </button>
+                    {% elif result.friendship_status == 'sent_pending' %}
+                        <span style="color: #666;">Request Sent</span>
+                    {% elif result.friendship_status == 'received_pending' %}
+                        <a href="{% url 'friend_requests' %}" class="btn btn-success">View Request</a>
+                    {% elif result.friendship_status == 'sent_accepted' or result.friendship_status == 'received_accepted' %}
+                        <span style="color: #27ae60;">✓ Friends</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% elif query %}
+        <div style="text-align: center; padding: 3rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <p style="color: #666;">No users found matching "{{ query }}"</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+async function sendFriendRequest(username) {
+    try {
+        const response = await fetch('/api/friends/request/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ username: username }),
+        });
+        
+        if (response.ok) {
+            alert('Friend request sent!');
+            location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Failed to send request'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to send friend request');
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
