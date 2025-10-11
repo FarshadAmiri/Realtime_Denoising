@@ -422,6 +422,27 @@ body {
     box-shadow: 0 0 6px #e74c3c;
     animation: pulse 1.2s infinite;
 }
+.streaming-indicator .status-text-alt {
+    color: #f39c12;
+}
+.stream-duration {
+    margin-left: 8px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+#stop-stream-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#stop-stream-btn .stop-label {
+    flex-shrink: 0;
+}
+#stop-stream-btn .stream-duration {
+    background: rgba(0,0,0,0.15);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
 @keyframes pulse {
     0% { transform: scale(1); opacity: 1; }
     50% { transform: scale(1.4); opacity: 0.6; }

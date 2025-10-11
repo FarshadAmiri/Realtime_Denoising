@@ -9,7 +9,7 @@ Refactored to:
 """
 import asyncio
 import uuid
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from pathlib import Path
 from django.conf import settings
 import av
@@ -44,6 +44,7 @@ class WebRTCSession:
         self.ready = asyncio.Event()
         # Queues for distributing processed frames to listeners (listener_id -> queue)
         self.listener_queues: Dict[str, asyncio.Queue] = {}
+        self.listener_pcs: Dict[str, Any] = {}
         # Track consumption task
         self._consume_task: Optional[asyncio.Task] = None
         self._closed = False
@@ -155,6 +156,7 @@ class WebRTCSession:
         listener_track = ListenerAudioTrack(q)
 
         listener_pc.addTrack(listener_track)
+        self.listener_pcs[listener_id] = listener_pc
 
         @listener_pc.on("connectionstatechange")
         async def on_connectionstatechange():
@@ -162,6 +164,11 @@ class WebRTCSession:
             if listener_pc.connectionState in ["failed", "closed"]:
                 # Remove its queue to stop feeding frames
                 self.listener_queues.pop(listener_id, None)
+                self.listener_pcs.pop(listener_id, None)
+                try:
+                    await listener_pc.close()
+                except Exception:
+                    pass
 
         # Set remote description
         await listener_pc.setRemoteDescription(
@@ -189,6 +196,14 @@ class WebRTCSession:
         # Close main peer connection
         if self.pc:
             await self.pc.close()
+        # Close listener peer connections
+        listener_pcs = list(self.listener_pcs.values())
+        self.listener_pcs.clear()
+        for listener_pc in listener_pcs:
+            try:
+                await listener_pc.close()
+            except Exception:
+                pass
         # Clear queues
         self.listener_queues.clear()
 

@@ -280,7 +280,8 @@ def stream_debug(request, username):
         'active': True,
         'session_id': session.session_id,
         'ready': session.ready.is_set(),
-        'has_processed_track': session.processed_track is not None,
-        'listeners': list(session.listeners.keys()),
+        'listener_count': len(session.listener_queues),
+        'listeners': list(session.listener_queues.keys()),
+        'processing_task_running': bool(session._consume_task and not session._consume_task.done()),
         'recording_path': str(session.recording_path) if session.recording_path else None,
     })

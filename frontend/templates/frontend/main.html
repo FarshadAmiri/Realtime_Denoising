@@ -9,10 +9,14 @@
     <aside class="sidebar">
         <div class="sidebar-header">
             <h2>Welcome, {{ user.username }}</h2>
-            <button id="start-stream-btn" class="btn btn-primary">Start Streaming</button>
-            <button id="stop-stream-btn" class="btn btn-danger" style="display:none;">Stop Streaming</button>
+            <button id="start-stream-btn" type="button" class="btn btn-primary">Start Streaming</button>
+            <button id="stop-stream-btn" type="button" class="btn btn-danger" style="display:none;">
+                <span class="stop-label">Stop Streaming</span>
+                <span id="stream-duration" class="stream-duration">00:00</span>
+            </button>
             <div id="streaming-indicator" class="streaming-indicator" style="display:none;">
-                <span class="dot"></span> Streaming now
+                <span class="dot"></span>
+                <span id="streaming-status-text">Streaming now</span>
             </div>
         </div>
         

@@ -4,8 +4,13 @@
 
 let webrtcClient = null;
 let presenceSocket = null;
-let isStreaming = false;
+let isStreaming = false; // local session actively broadcasting
+let serverStreaming = false; // backend-reported streaming flag
 let streamingIndicatorEl = null;
+let streamingStatusTextEl = null;
+let streamDurationEl = null;
+let streamTimerInterval = null;
+let streamStartedAt = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,6 +26,7 @@ function setupEventListeners() {
     const startBtn = document.getElementById('start-stream-btn');
     const stopBtn = document.getElementById('stop-stream-btn');
     const searchInput = document.getElementById('search-input');
+    streamDurationEl = document.getElementById('stream-duration');
 
     // Create/locate streaming indicator
     streamingIndicatorEl = document.getElementById('streaming-indicator');
@@ -31,10 +37,11 @@ function setupEventListeners() {
             streamingIndicatorEl.id = 'streaming-indicator';
             streamingIndicatorEl.style.display = 'none';
             streamingIndicatorEl.className = 'streaming-indicator';
-            streamingIndicatorEl.innerHTML = '<span class="dot"></span> Streaming now';
+            streamingIndicatorEl.innerHTML = '<span class="dot"></span><span id="streaming-status-text">Streaming now</span>';
             header.appendChild(streamingIndicatorEl);
         }
     }
+    streamingStatusTextEl = document.getElementById('streaming-status-text');
 
     startBtn.addEventListener('click', startStreaming);
     stopBtn.addEventListener('click', stopStreaming);
@@ -51,6 +58,8 @@ function setupEventListeners() {
             document.getElementById('search-results').classList.remove('show');
         }
     });
+
+    updateStreamingUI();
 }
 
 function initializePresenceWebSocket() {
@@ -99,6 +108,46 @@ async function loadFriends() {
     }
 }
 
+function startStreamTimer() {
+    if (!streamDurationEl) return;
+    streamStartedAt = Date.now();
+    updateStreamDuration();
+    if (streamTimerInterval) {
+        clearInterval(streamTimerInterval);
+    }
+    streamTimerInterval = setInterval(updateStreamDuration, 1000);
+}
+
+function updateStreamDuration() {
+    if (!streamDurationEl || streamStartedAt === null) return;
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - streamStartedAt) / 1000));
+    streamDurationEl.textContent = formatDuration(elapsedSeconds);
+}
+
+function stopStreamTimer() {
+    if (streamTimerInterval) {
+        clearInterval(streamTimerInterval);
+        streamTimerInterval = null;
+    }
+    streamStartedAt = null;
+    if (streamDurationEl) {
+        streamDurationEl.textContent = '00:00';
+    }
+}
+
+function formatDuration(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const parts = [];
+    if (hours > 0) {
+        parts.push(hours.toString().padStart(2, '0'));
+    }
+    parts.push(minutes.toString().padStart(2, '0'));
+    parts.push(seconds.toString().padStart(2, '0'));
+    return parts.join(':');
+}
+
 function displayFriends(friends) {
     const friendsList = document.getElementById('friends-list');
     
@@ -123,23 +172,29 @@ function updateFriendsStatus(friends) {
     });
 }
 
-function updateFriendStatus(username, isStreaming) {
+function updateFriendStatus(username, isStreamingRemote) {
     const statusElement = document.getElementById(`status-${username}`);
     if (statusElement) {
-        statusElement.textContent = isStreaming ? 'Streaming' : 'Offline';
-        statusElement.classList.toggle('streaming', isStreaming);
+        statusElement.textContent = isStreamingRemote ? 'Streaming' : 'Offline';
+        statusElement.classList.toggle('streaming', isStreamingRemote);
     }
-    // If this is the current user, update UI
+
+    // If this refers to the current user, treat it as backend status update
     if (username === usernameGlobalSafe()) {
-        if (isStreaming !== isStreamingFlag()) {
-            isStreaming = isStreaming; // keep global
+        const changed = serverStreaming !== isStreamingRemote;
+        serverStreaming = isStreamingRemote;
+        if (!serverStreaming && isStreaming) {
+            // Backend reports stream stopped; align local state
+            isStreaming = false;
+            stopStreamTimer();
+        }
+        if (changed) {
             updateStreamingUI();
         }
     }
 }
 
 function usernameGlobalSafe() { return typeof username !== 'undefined' ? username : null; }
-function isStreamingFlag() { return isStreaming; }
 
 async function syncOwnStreamingStatus() {
     const me = usernameGlobalSafe();
@@ -148,9 +203,17 @@ async function syncOwnStreamingStatus() {
         const resp = await fetch(`/api/stream/status/${me}/`);
         if (!resp.ok) return;
         const data = await resp.json();
-        if (typeof data.is_streaming === 'boolean' && data.is_streaming !== isStreaming) {
-            isStreaming = data.is_streaming;
-            updateStreamingUI();
+        if (typeof data.is_streaming === 'boolean') {
+            const backendStatus = data.is_streaming;
+            if (!backendStatus && (isStreaming || serverStreaming)) {
+                isStreaming = false;
+                serverStreaming = false;
+                stopStreamTimer();
+                updateStreamingUI();
+            } else if (backendStatus !== serverStreaming) {
+                serverStreaming = backendStatus;
+                updateStreamingUI();
+            }
         }
     } catch (e) { /* ignore transient */ }
 }
@@ -293,26 +356,41 @@ async function startStreaming() {
 
         // 2. Optimistic UI update (so user sees immediate feedback)
         isStreaming = true;
+        serverStreaming = true;
         updateStreamingUI();
 
         // 3. Start WebRTC broadcast (might still fail; handle rollback)
         webrtcClient = new WebRTCClient();
         await webrtcClient.startBroadcast();
         console.log('[Streaming] WebRTC broadcast established');
+
+        // 4. Begin timer display
+        startStreamTimer();
         
-        // 4. Optionally force refresh of own status display
+        // 5. Optionally force refresh of own status display
         syncOwnStreamingStatus();
         
     } catch (error) {
         console.error('Error starting stream:', error);
         alert('Failed to start streaming: ' + error.message);
         // Rollback UI if we set streaming optimistically
-        if (isStreaming) {
+        if (isStreaming || serverStreaming) {
             isStreaming = false;
+            serverStreaming = false;
             updateStreamingUI();
         }
+        stopStreamTimer();
         // Inform backend if session was created but we failed after (best effort)
         try { if (webrtcClient) { webrtcClient.stopBroadcast(); } } catch (_) {}
+        try {
+            await fetch('/api/stream/stop/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+        } catch (_) { /* swallow */ }
     }
 }
 
@@ -337,10 +415,12 @@ async function stopStreaming() {
             const data = await response.json();
             console.error('Error stopping stream:', data.error);
         }
-        
-    isStreaming = false;
-    updateStreamingUI();
-    console.log('Streaming stopped');
+
+        isStreaming = false;
+        serverStreaming = false;
+        updateStreamingUI();
+        stopStreamTimer();
+        console.log('Streaming stopped');
         
     } catch (error) {
         console.error('Error stopping stream:', error);
@@ -352,13 +432,38 @@ function updateStreamingUI() {
     const startBtn = document.getElementById('start-stream-btn');
     const stopBtn = document.getElementById('stop-stream-btn');
     if (!startBtn || !stopBtn) return;
+    const stopLabelEl = stopBtn.querySelector('.stop-label');
+
     if (isStreaming) {
         startBtn.style.display = 'none';
-        stopBtn.style.display = 'block';
-        if (streamingIndicatorEl) streamingIndicatorEl.style.display = 'block';
+        stopBtn.style.display = 'flex';
+        if (stopLabelEl) stopLabelEl.textContent = 'Stop Streaming';
+    } else if (serverStreaming) {
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'flex';
+        if (stopLabelEl) stopLabelEl.textContent = 'Stop Remote Stream';
+        stopStreamTimer();
+        if (streamDurationEl) {
+            streamDurationEl.textContent = '--:--';
+        }
     } else {
-        startBtn.style.display = 'block';
+        startBtn.style.display = 'inline-block';
         stopBtn.style.display = 'none';
-        if (streamingIndicatorEl) streamingIndicatorEl.style.display = 'none';
+        if (stopLabelEl) stopLabelEl.textContent = 'Stop Streaming';
+        if (!serverStreaming) {
+            stopStreamTimer();
+        }
+    }
+
+    if (streamingIndicatorEl) {
+        if (serverStreaming) {
+            streamingIndicatorEl.style.display = 'flex';
+            if (streamingStatusTextEl) {
+                streamingStatusTextEl.textContent = isStreaming ? 'Streaming now' : 'Streaming active on another device';
+                streamingStatusTextEl.classList.toggle('status-text-alt', !isStreaming);
+            }
+        } else {
+            streamingIndicatorEl.style.display = 'none';
+        }
     }
 }
