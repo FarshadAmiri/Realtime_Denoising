@@ -4,15 +4,48 @@
 
 let webrtcClient = null;
 let isListening = false;
+let presenceSocket = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    initializePresenceWebSocket();
     checkStreamStatus();
     loadRecordings();
     setupEventListeners();
     
-    // Poll stream status every 5 seconds
-    setInterval(checkStreamStatus, 5000);
+    // Poll stream status every 3 seconds as backup
+    setInterval(checkStreamStatus, 3000);
 });
+
+function initializePresenceWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/presence/`;
+    
+    presenceSocket = new WebSocket(wsUrl);
+    
+    presenceSocket.onopen = () => {
+        console.log('Friend page: Presence WebSocket connected');
+    };
+    
+    presenceSocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        // Listen for streaming status updates of the friend we're viewing
+        if (data.type === 'streaming_status' && data.username === friendUsername) {
+            console.log(`Friend ${friendUsername} streaming status changed: ${data.is_streaming}`);
+            checkStreamStatus(); // Immediately update status
+        }
+    };
+    
+    presenceSocket.onerror = (error) => {
+        console.error('Friend page WebSocket error:', error);
+    };
+    
+    presenceSocket.onclose = () => {
+        console.log('Friend page: Presence WebSocket closed');
+        // Reconnect after 5 seconds
+        setTimeout(initializePresenceWebSocket, 5000);
+    };
+}
 
 function setupEventListeners() {
     const listenBtn = document.getElementById('listen-btn');

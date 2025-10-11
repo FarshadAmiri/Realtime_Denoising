@@ -50,6 +50,7 @@ def start_stream(request):
     
     # Notify friends via WebSocket
     channel_layer = get_channel_layer()
+    logger.info(f"Sending streaming_status_update via channel layer for user {user.username} (is_streaming=True)")
     async_to_sync(channel_layer.group_send)(
         "presence",
         {
@@ -58,6 +59,7 @@ def start_stream(request):
             'is_streaming': True
         }
     )
+    logger.info(f"Channel layer notification sent for user {user.username}")
     
     return Response({
         'session_id': session.session_id,
@@ -91,6 +93,7 @@ def stop_stream(request):
 
     # Notify friends
     channel_layer = get_channel_layer()
+    logger.info(f"Sending streaming_status_update via channel layer for user {user.username} (is_streaming=False)")
     async_to_sync(channel_layer.group_send)(
         "presence",
         {
@@ -99,6 +102,7 @@ def stop_stream(request):
             'is_streaming': False
         }
     )
+    logger.info(f"Channel layer notification sent for user {user.username}")
 
     return Response({'message': 'Stream stopped'})
 

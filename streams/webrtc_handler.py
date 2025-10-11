@@ -48,6 +48,9 @@ class WebRTCSession:
         # Track consumption task
         self._consume_task: Optional[asyncio.Task] = None
         self._closed = False
+        # Audio recording
+        self._recording_frames = []
+        self._recording_sample_rate = None
     
     async def handle_offer(self, offer_sdp: str) -> str:
         """
@@ -65,9 +68,10 @@ class WebRTCSession:
 
         self.pc = RTCPeerConnection()
         self.processor = get_processor()
-        # (Recording path reserved for future implementation)
-        self.recording_path = Path(settings.MEDIA_ROOT) / 'recordings' / f"{self.session_id}.wav"
-        self.recording_path.parent.mkdir(parents=True, exist_ok=True)
+        # Setup recording path in streamed_audios directory
+        streamed_audios_dir = Path(settings.BASE_DIR) / 'streamed_audios'
+        streamed_audios_dir.mkdir(parents=True, exist_ok=True)
+        self.recording_path = streamed_audios_dir / f"{self.username}_{self.session_id}.wav"
 
         @self.pc.on("track")
         async def on_track(track):
@@ -84,11 +88,20 @@ class WebRTCSession:
                             audio_mono = audio_array[0]
                         else:
                             audio_mono = audio_array
+                        
+                        # Store sample rate for recording
+                        if self._recording_sample_rate is None:
+                            self._recording_sample_rate = frame.sample_rate
+                        
                         try:
                             denoised = await self.processor.process_frame(audio_mono)
                         except Exception as e:
                             print(f"Denoise error: {e}")
                             denoised = audio_mono
+                        
+                        # Store denoised audio for recording
+                        self._recording_frames.append(denoised.copy())
+                        
                         if denoised.ndim == 1:
                             denoised = denoised.reshape(1, -1)
                         processed_frame = av.AudioFrame.from_ndarray(denoised, format='flt', layout='mono')
@@ -109,6 +122,8 @@ class WebRTCSession:
                         print(f"Frame consumption ended: {e}")
                         break
                 self.ready.clear()
+                # Save recording when stream ends
+                await self._save_recording()
 
             if not self._consume_task:
                 self.ready.set()
@@ -180,9 +195,85 @@ class WebRTCSession:
         await listener_pc.setLocalDescription(answer)
         return listener_pc.localDescription.sdp
     
+    async def _save_recording(self):
+        """Save the recorded denoised audio to file."""
+        if not self._recording_frames or not self._recording_sample_rate:
+            print(f"No audio frames to save for session {self.session_id}")
+            return
+        
+        try:
+            import numpy as np
+            import soundfile as sf
+            from datetime import datetime
+            
+            # Concatenate all frames
+            full_audio = np.concatenate(self._recording_frames)
+            
+            # Save to WAV file
+            sf.write(
+                str(self.recording_path),
+                full_audio,
+                self._recording_sample_rate,
+                subtype='PCM_16'
+            )
+            
+            duration = len(full_audio) / self._recording_sample_rate
+            print(f"Saved recording to {self.recording_path} (duration: {duration:.2f}s)")
+            
+            # Create database record
+            from django.contrib.auth import get_user_model
+            from .models import StreamRecording
+            from asgiref.sync import sync_to_async
+            
+            User = get_user_model()
+            
+            @sync_to_async
+            def create_recording():
+                try:
+                    user = User.objects.get(username=self.username)
+                    # Copy file to media directory
+                    import shutil
+                    from django.core.files import File
+                    
+                    media_recordings_dir = Path(settings.MEDIA_ROOT) / 'recordings'
+                    media_recordings_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    media_filename = f"{self.username}_{timestamp}.wav"
+                    media_path = media_recordings_dir / media_filename
+                    
+                    shutil.copy(str(self.recording_path), str(media_path))
+                    
+                    # Create database record
+                    recording = StreamRecording.objects.create(
+                        owner=user,
+                        title=f"Stream {timestamp}",
+                        duration=duration
+                    )
+                    
+                    # Assign the file
+                    with open(str(media_path), 'rb') as f:
+                        recording.file.save(media_filename, File(f), save=True)
+                    
+                    print(f"Created StreamRecording #{recording.id} for user {self.username}")
+                    return recording
+                except Exception as e:
+                    print(f"Error creating StreamRecording: {e}")
+                    return None
+            
+            await create_recording()
+            
+        except Exception as e:
+            print(f"Error saving recording: {e}")
+            import traceback
+            traceback.print_exc()
+    
     async def close(self):
         """Close the WebRTC session and cleanup."""
         print(f"Closing session {self.session_id}")
+        
+        # Save recording before closing
+        await self._save_recording()
         
         # Stop processing loop
         self._closed = True
