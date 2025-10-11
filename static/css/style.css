@@ -114,6 +114,30 @@ body {
     margin-bottom: 15px;
 }
 
+.denoise-toggle-container {
+    margin-bottom: 10px;
+    padding: 8px 0;
+}
+
+.denoise-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.denoise-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.denoise-label span {
+    font-size: 14px;
+    color: #ecf0f1;
+}
+
 .friends-section, .friend-requests-section {
     padding: 20px;
     flex: 1;

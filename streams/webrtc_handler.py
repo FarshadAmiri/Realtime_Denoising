@@ -35,9 +35,10 @@ class WebRTCSession:
     Manages a WebRTC session for audio streaming.
     """
     
-    def __init__(self, session_id: str, username: str):
+    def __init__(self, session_id: str, username: str, denoise_enabled: bool = True):
         self.session_id = session_id
         self.username = username
+        self.denoise_enabled = denoise_enabled
         self.pc = None
         self.processor = None
         self.recording_path: Optional[Path] = None
@@ -93,18 +94,25 @@ class WebRTCSession:
                         if self._recording_sample_rate is None:
                             self._recording_sample_rate = frame.sample_rate
                         
-                        try:
-                            denoised = await self.processor.process_frame(audio_mono)
-                        except Exception as e:
-                            print(f"Denoise error: {e}")
-                            denoised = audio_mono
+                        # Conditionally apply denoising based on session flag
+                        if self.denoise_enabled:
+                            try:
+                                processed_audio = await self.processor.process_frame(audio_mono)
+                                print(f"[Session {self.session_id}] Applied denoising")
+                            except Exception as e:
+                                print(f"Denoise error: {e}")
+                                processed_audio = audio_mono
+                        else:
+                            # Pass through raw audio without denoising
+                            processed_audio = audio_mono
+                            print(f"[Session {self.session_id}] Bypassing denoising (raw mode)")
                         
-                        # Store denoised audio for recording
-                        self._recording_frames.append(denoised.copy())
+                        # Store processed audio for recording
+                        self._recording_frames.append(processed_audio.copy())
                         
-                        if denoised.ndim == 1:
-                            denoised = denoised.reshape(1, -1)
-                        processed_frame = av.AudioFrame.from_ndarray(denoised, format='flt', layout='mono')
+                        if processed_audio.ndim == 1:
+                            processed_audio = processed_audio.reshape(1, -1)
+                        processed_frame = av.AudioFrame.from_ndarray(processed_audio, format='flt', layout='mono')
                         processed_frame.sample_rate = frame.sample_rate
                         processed_frame.time_base = frame.time_base
                         processed_frame.pts = frame.pts
@@ -303,11 +311,12 @@ class WebRTCSession:
 _sessions: Dict[str, WebRTCSession] = {}
 
 
-def create_session(username: str) -> WebRTCSession:
+def create_session(username: str, denoise: bool = True) -> WebRTCSession:
     """Create a new WebRTC session."""
     session_id = str(uuid.uuid4())
-    session = WebRTCSession(session_id, username)
+    session = WebRTCSession(session_id, username, denoise_enabled=denoise)
     _sessions[session_id] = session
+    print(f"Created session {session_id} for {username} with denoise_enabled={denoise}")
     return session
 
 

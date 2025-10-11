@@ -9,6 +9,12 @@
     <aside class="sidebar">
         <div class="sidebar-header">
             <h2>Welcome, {{ user.username }}</h2>
+            <div id="denoise-toggle-container" class="denoise-toggle-container">
+                <label for="denoise-toggle" class="denoise-label">
+                    <input type="checkbox" id="denoise-toggle" checked>
+                    <span>Enable Denoising</span>
+                </label>
+            </div>
             <button id="start-stream-btn" type="button" class="btn btn-primary">Start Streaming</button>
             <button id="stop-stream-btn" type="button" class="btn btn-danger" style="display:none;">
                 <span class="stop-label">Stop Streaming</span>

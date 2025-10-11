@@ -10,7 +10,7 @@ class WebRTCClient {
         this.sessionId = null;
     }
 
-    async startBroadcast() {
+    async startBroadcast(denoiseEnabled = true) {
         try {
             // Get microphone access
             this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -41,7 +41,7 @@ class WebRTCClient {
             // Wait for ICE gathering to complete
             await this.waitForIceGathering();
 
-            // Send offer to server
+            // Send offer to server with denoise flag
             const response = await fetch('/api/webrtc/offer/', {
                 method: 'POST',
                 headers: {
@@ -50,7 +50,8 @@ class WebRTCClient {
                 },
                 body: JSON.stringify({
                     sdp: this.pc.localDescription.sdp,
-                    type: 'offer'
+                    type: 'offer',
+                    denoise: denoiseEnabled
                 })
             });
 

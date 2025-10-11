@@ -11,6 +11,7 @@ let streamingStatusTextEl = null;
 let streamDurationEl = null;
 let streamTimerInterval = null;
 let streamStartedAt = null;
+let denoiseEnabled = true; // default to enabled
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,6 +35,7 @@ function setupEventListeners() {
     const startBtn = document.getElementById('start-stream-btn');
     const stopBtn = document.getElementById('stop-stream-btn');
     const searchInput = document.getElementById('search-input');
+    const denoiseToggle = document.getElementById('denoise-toggle');
     streamDurationEl = document.getElementById('stream-duration');
 
     // Create/locate streaming indicator
@@ -53,6 +55,14 @@ function setupEventListeners() {
 
     startBtn.addEventListener('click', startStreaming);
     stopBtn.addEventListener('click', stopStreaming);
+    
+    // Handle denoise toggle
+    if (denoiseToggle) {
+        denoiseToggle.addEventListener('change', (e) => {
+            denoiseEnabled = e.target.checked;
+            console.log('[Denoise] Toggle changed to:', denoiseEnabled);
+        });
+    }
     
     // Search functionality
     let searchTimeout;
@@ -374,14 +384,17 @@ async function respondToRequest(requestId, action) {
 
 async function startStreaming() {
     try {
-        console.log('[Streaming] Initiating start');
+        console.log('[Streaming] Initiating start with denoise:', denoiseEnabled);
         // 1. Tell backend to mark stream active (session created)
         const response = await fetch('/api/stream/start/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
-            }
+            },
+            body: JSON.stringify({ 
+                denoise: denoiseEnabled 
+            })
         });
         const data = await response.json();
         if (!response.ok) {
@@ -395,7 +408,7 @@ async function startStreaming() {
 
         // 3. Start WebRTC broadcast (might still fail; handle rollback)
         webrtcClient = new WebRTCClient();
-        await webrtcClient.startBroadcast();
+        await webrtcClient.startBroadcast(denoiseEnabled);
         console.log('[Streaming] WebRTC broadcast established');
 
         // 4. Begin timer display
@@ -495,6 +508,7 @@ function handlePageUnload(event) {
 function updateStreamingUI() {
     const startBtn = document.getElementById('start-stream-btn');
     const stopBtn = document.getElementById('stop-stream-btn');
+    const denoiseToggleContainer = document.getElementById('denoise-toggle-container');
     if (!startBtn || !stopBtn) return;
     const stopLabelEl = stopBtn.querySelector('.stop-label');
 
@@ -502,6 +516,8 @@ function updateStreamingUI() {
         startBtn.style.display = 'none';
         stopBtn.style.display = 'flex';
         if (stopLabelEl) stopLabelEl.textContent = 'Stop Streaming';
+        // Hide denoise toggle when streaming
+        if (denoiseToggleContainer) denoiseToggleContainer.style.display = 'none';
     } else if (serverStreaming) {
         startBtn.style.display = 'none';
         stopBtn.style.display = 'flex';
@@ -510,6 +526,8 @@ function updateStreamingUI() {
         if (streamDurationEl) {
             streamDurationEl.textContent = '--:--';
         }
+        // Hide denoise toggle when streaming
+        if (denoiseToggleContainer) denoiseToggleContainer.style.display = 'none';
     } else {
         startBtn.style.display = 'inline-block';
         stopBtn.style.display = 'none';
@@ -517,6 +535,8 @@ function updateStreamingUI() {
         if (!serverStreaming) {
             stopStreamTimer();
         }
+        // Show denoise toggle when not streaming
+        if (denoiseToggleContainer) denoiseToggleContainer.style.display = 'block';
     }
 
     if (streamingIndicatorEl) {
