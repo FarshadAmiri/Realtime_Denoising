@@ -26,6 +26,10 @@ def start_stream(request):
     """Start a new streaming session."""
     user = request.user
     
+    # Get denoise flag from request (default to True)
+    denoise = request.data.get('denoise', True)
+    logger.info(f"Starting stream for user {user.username} with denoise={denoise}")
+    
     # Check if user already has an active stream
     existing_session = get_session_by_username(user.username)
     if existing_session:
@@ -34,8 +38,8 @@ def start_stream(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Create new session
-    session = create_session(user.username)
+    # Create new session with denoise flag
+    session = create_session(user.username, denoise=denoise)
     logger.info(f"Created streaming session {session.session_id} for user {user.username}")
     
     # Update user streaming status
@@ -113,6 +117,7 @@ def webrtc_offer(request):
     """Handle WebRTC offer from broadcaster."""
     user = request.user
     offer_sdp = request.data.get('sdp')
+    denoise = request.data.get('denoise', True)
 
     # Early dependency check for clearer error
     try:
@@ -137,9 +142,14 @@ def webrtc_offer(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Update session denoise setting if it was not set during creation
+    if not hasattr(session, 'denoise_enabled'):
+        session.denoise_enabled = denoise
+        logger.info(f"Setting denoise_enabled={denoise} for session {session.session_id}")
+    
     # Handle offer asynchronously
     try:
-        logger.info(f"Handling broadcaster WebRTC offer for user {user.username} session {session.session_id}")
+        logger.info(f"Handling broadcaster WebRTC offer for user {user.username} session {session.session_id} (denoise={session.denoise_enabled})")
         answer_sdp = async_to_sync(session.handle_offer)(offer_sdp)
         logger.info(f"Generated WebRTC answer for user {user.username} session {session.session_id}")
         return Response({
