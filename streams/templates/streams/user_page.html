@@ -217,9 +217,13 @@
                     </div>
                 </div>
                 <div class="recording-actions">
+                    {% if recording.file %}
                     <audio controls preload="none">
                         <source src="{{ recording.file.url }}" type="audio/wav">
                     </audio>
+                    {% else %}
+                    <span style="color:#999;">No file</span>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -329,6 +333,23 @@
             String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
     }
     
+    // Helper: wait for ICE gathering to complete (non-trickle)
+    function waitForIceGathering(pc) {
+        return new Promise(resolve => {
+            if (pc.iceGatheringState === 'complete') {
+                resolve();
+            } else {
+                function checkState() {
+                    if (pc.iceGatheringState === 'complete') {
+                        pc.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }
+                }
+                pc.addEventListener('icegatheringstatechange', checkState);
+            }
+        });
+    }
+
     // Broadcaster functions
     async function startStream() {
         try {
@@ -352,8 +373,43 @@
             
             const data = await response.json();
             
-            // Get microphone access
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            // Get microphone access (48k mono, no processing)
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    channelCount: { ideal: 1 },
+                    sampleRate: { ideal: 48000 },
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                }, 
+                video: false 
+            });
+
+            // Create RTCPeerConnection and add audio track
+            peerConnection = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+            });
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            
+            // Create SDP offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            await waitForIceGathering(peerConnection);
+            
+            // Send offer to server and set answer
+            const offerResp = await fetch('/api/stream/offer/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ sdp: peerConnection.localDescription.sdp }),
+            });
+            if (!offerResp.ok) {
+                throw new Error('Failed to negotiate WebRTC');
+            }
+            const answerData = await offerResp.json();
+            await peerConnection.setRemoteDescription({ type: 'answer', sdp: answerData.sdp });
             
             document.getElementById('start-btn').style.display = 'none';
             document.getElementById('stop-btn').style.display = 'inline-block';
@@ -361,9 +417,6 @@
             document.getElementById('stream-status').textContent = 'Streaming...';
             
             startTimer();
-            
-            // Note: Actual WebRTC streaming to server would be implemented here
-            // For simplicity in this MVP, we're showing the UI controls
             
         } catch (error) {
             console.error('Error starting stream:', error);
@@ -373,6 +426,13 @@
     
     async function stopStream() {
         try {
+            // Close peer connection
+            if (peerConnection) {
+                try { peerConnection.getSenders().forEach(s => s.track && s.track.stop()); } catch (e) {}
+                try { peerConnection.close(); } catch (e) {}
+                peerConnection = null;
+            }
+
             // Stop tracks
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
@@ -420,11 +480,46 @@
             document.getElementById('listen-btn').style.display = 'none';
             document.getElementById('stop-listen-btn').style.display = 'inline-block';
             
-            // Note: Actual WebRTC peer connection would be set up here
-            // For this MVP, we're showing the UI
-            
+            // Create RTCPeerConnection
+            peerConnection = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+            });
+            const remoteAudio = document.getElementById('remote-audio');
+            peerConnection.addEventListener('track', (event) => {
+                if (remoteAudio.srcObject !== event.streams[0]) {
+                    remoteAudio.srcObject = event.streams[0];
+                    remoteAudio.style.display = 'block';
+                    // Try autoplay in case browser blocks it
+                    const playAttempt = remoteAudio.play();
+                    if (playAttempt && playAttempt.catch) {
+                        playAttempt.catch(() => {/* ignore */});
+                    }
+                }
+            });
+            // Request recvonly audio
+            peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+
+            // Create offer and wait for ICE gathering
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            await waitForIceGathering(peerConnection);
+
+            // Send offer to server for listener
+            const resp = await fetch(`/api/stream/listener/${encodeURIComponent(username)}/offer/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ sdp: peerConnection.localDescription.sdp }),
+            });
+            if (!resp.ok) {
+                throw new Error('Failed to negotiate listen connection');
+            }
+            const answer = await resp.json();
+            await peerConnection.setRemoteDescription({ type: 'answer', sdp: answer.sdp });
+
             document.getElementById('listen-status').textContent = 'Listening to live stream...';
-            document.getElementById('remote-audio').style.display = 'block';
             
         } catch (error) {
             console.error('Error starting listening:', error);
@@ -434,7 +529,7 @@
     
     function stopListening() {
         if (peerConnection) {
-            peerConnection.close();
+            try { peerConnection.close(); } catch (e) {}
             peerConnection = null;
         }
         

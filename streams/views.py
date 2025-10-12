@@ -1,229 +1,234 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods, require_POST, require_GET
+from django.db import models
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+
+from .models import StreamRecording, ActiveStream
+from .webrtc_handler import create_session, get_session_by_username, close_session
+from users.models import Friendship
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-import uuid
-import json
-
-from .models import ActiveStream, StreamRecording
-from users.models import Friendship
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def start_stream(request):
-    """Start a new audio stream."""
-    denoise = request.data.get('denoise', True)
-    
-    # Check if user already has an active stream
-    existing = ActiveStream.objects.filter(user=request.user).first()
-    if existing:
-        return Response({'error': 'Stream already active'}, status=400)
-    
-    # Create new active stream
-    session_id = uuid.uuid4()
-    stream = ActiveStream.objects.create(
-        user=request.user,
-        session_id=session_id,
-        denoise_enabled=denoise
-    )
-    
-    # Broadcast presence update
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "presence",
-        {
-            "type": "streaming_status_update",
-            "username": request.user.username,
-            "is_streaming": True,
-        }
-    )
-    
-    return Response({
-        'session_id': str(session_id),
-        'status': 'started'
-    })
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def stop_stream(request):
-    """Stop the current audio stream and save recording."""
-    try:
-        stream = ActiveStream.objects.get(user=request.user)
-        
-        # Get recording info from request (if any)
-        duration = request.data.get('duration', 0.0)
-        
-        # Create recording entry (file would be uploaded separately in full implementation)
-        from datetime import datetime
-        title = f"Stream {stream.started_at.strftime('%Y-%m-%d %H:%M')}"
-        
-        # Note: In a full implementation, the audio file would be saved by the
-        # AudioProcessor and the path passed here. For now, we create a placeholder.
-        recording = StreamRecording.objects.create(
-            owner=request.user,
-            title=title,
-            duration=duration,
-            denoise_enabled=stream.denoise_enabled,
-        )
-        
-        # Delete active stream
-        stream.delete()
-        
-        # Broadcast presence update
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            "presence",
-            {
-                "type": "streaming_status_update",
-                "username": request.user.username,
-                "is_streaming": False,
-            }
-        )
-        
-        return Response({
-            'status': 'stopped',
-            'recording_id': recording.id,
-        })
-    except ActiveStream.DoesNotExist:
-        return Response({'error': 'No active stream'}, status=400)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def stream_status(request, username):
-    """Get streaming status for a user."""
-    try:
-        user = User.objects.get(username=username)
-        is_streaming = ActiveStream.objects.filter(user=user).exists()
-        
-        if is_streaming:
-            stream = ActiveStream.objects.get(user=user)
-            return Response({
-                'is_streaming': True,
-                'session_id': str(stream.session_id),
-                'started_at': stream.started_at.isoformat(),
-                'denoise_enabled': stream.denoise_enabled,
-            })
-        else:
-            return Response({'is_streaming': False})
-    except User.DoesNotExist:
-        return Response({'error': 'User not found'}, status=404)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def save_audio_chunk(request):
-    """
-    Save audio chunk data (for WebRTC streaming).
-    
-    In a full implementation, this would receive audio data from the broadcaster,
-    process it through AudioProcessor, and fan out to listeners.
-    """
-    try:
-        session_id = request.data.get('session_id')
-        audio_data = request.data.get('audio_data')  # Base64 encoded audio
-        
-        # Verify user has active stream
-        stream = ActiveStream.objects.get(user=request.user, session_id=session_id)
-        
-        # In full implementation:
-        # 1. Decode audio data
-        # 2. Process through AudioProcessor
-        # 3. Fan out to listeners via WebSocket
-        # 4. Store in recording buffer
-        
-        return Response({'status': 'received'})
-        
-    except ActiveStream.DoesNotExist:
-        return Response({'error': 'No active stream'}, status=400)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def recordings_list(request, username=None):
-    """List recordings for a user."""
-    if username:
-        # Get recordings for specific user
-        target_user = get_object_or_404(User, username=username)
-        
-        # Check if requester can view (owner or friend)
-        if request.user != target_user:
-            if not Friendship.are_friends(request.user, target_user):
-                return Response({'error': 'Not authorized'}, status=403)
-        
-        recordings = StreamRecording.objects.filter(owner=target_user)
-    else:
-        # Get own recordings
-        recordings = StreamRecording.objects.filter(owner=request.user)
-    
-    data = [{
-        'id': r.id,
-        'title': r.title,
-        'duration': r.duration,
-        'duration_display': r.get_duration_display(),
-        'file_url': r.file.url if r.file else None,
-        'created_at': r.created_at.isoformat(),
-        'denoise_enabled': r.denoise_enabled,
-    } for r in recordings]
-    
-    return Response({'recordings': data})
 
 
 @login_required
-def main_page(request):
-    """Main page with friends list and stream interface."""
-    from django.db.models import Q
-    
-    # Get user's friends
-    friendships = Friendship.objects.filter(
-        Q(from_user=request.user, status='accepted') |
-        Q(to_user=request.user, status='accepted')
-    ).select_related('from_user', 'to_user')
-    
+def page_broadcaster(request):
+    # Build friends list with streaming status
+    user = request.user
+    # Friends are accepted relationships in either direction
+    outgoing_ids = list(
+        Friendship.objects.filter(from_user=user, status='accepted').values_list('to_user_id', flat=True)
+    )
+    incoming_ids = list(
+        Friendship.objects.filter(to_user=user, status='accepted').values_list('from_user_id', flat=True)
+    )
+    friend_ids = list(set(outgoing_ids + incoming_ids))
+    friend_users = User.objects.filter(id__in=friend_ids)
+
     friends = []
-    for friendship in friendships:
-        friend = friendship.to_user if friendship.from_user == request.user else friendship.from_user
-        is_streaming = ActiveStream.objects.filter(user=friend).exists()
+    for fu in friend_users:
         friends.append({
-            'username': friend.username,
-            'is_streaming': is_streaming,
+            'username': fu.username,
+            'is_streaming': ActiveStream.objects.filter(user=fu).exists(),
         })
-    
-    return render(request, 'streams/main.html', {
-        'friends': friends,
-    })
+
+    return render(request, 'streams/main.html', { 'friends': friends })
 
 
 @login_required
-def user_page(request, username):
-    """User/friend page showing their stream and recordings."""
-    target_user = get_object_or_404(User, username=username)
-    
-    # Check access
-    is_owner = request.user == target_user
-    is_friend = Friendship.are_friends(request.user, target_user)
-    
-    if not is_owner and not is_friend:
-        return render(request, 'streams/no_access.html', {'username': username})
-    
-    # Get stream status
+def page_listener(request, username):
+    # Use existing template from streams app with full context
+    try:
+        target_user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return render(request, 'streams/no_access.html', { 'username': username })
+
+    is_owner = request.user.id == target_user.id
+    # Enforce friendship for non-owners
+    if not is_owner and not Friendship.are_friends(request.user, target_user):
+        return render(request, 'streams/no_access.html', { 'username': username })
+
     is_streaming = ActiveStream.objects.filter(user=target_user).exists()
-    
-    # Get recordings
-    recordings = StreamRecording.objects.filter(owner=target_user)
-    
-    return render(request, 'streams/user_page.html', {
+    recordings = StreamRecording.objects.filter(owner=target_user).order_by('-created_at')
+
+    ctx = {
         'target_user': target_user,
         'is_owner': is_owner,
         'is_streaming': is_streaming,
         'recordings': recordings,
-    })
+    }
+    return render(request, 'streams/user_page.html', ctx)
+
+
+# Compatibility views expected by audio_stream_project.urls
+def main_page(request):
+    """Serve the broadcaster page at root for quick testing."""
+    return page_broadcaster(request)
+
+
+def user_page(request, username):
+    """Serve a simple listener page for the given username."""
+    return page_listener(request, username)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def start_stream(request):
+    user = request.user
+    denoise = bool(request.data.get('denoise', True))
+    # Close any lingering session first
+    existing = get_session_by_username(user.username)
+    if existing:
+        async_to_sync(close_session)(existing.session_id)
+    session = create_session(user.username, denoise=denoise)
+    # Mark as active and broadcast presence
+    ActiveStream.objects.update_or_create(
+        user=user,
+        defaults={
+            'session_id': session.session_id,
+            'denoise_enabled': denoise,
+        },
+    )
+    try:
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'presence',
+            {
+                'type': 'streaming_status_update',
+                'username': user.username,
+                'is_streaming': True,
+            },
+        )
+    except Exception:
+        pass
+    return Response({'session_id': session.session_id, 'denoise': denoise})
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def stop_stream(request):
+    user = request.user
+    session = get_session_by_username(user.username)
+    if not session:
+        # Ensure ActiveStream is cleared and presence broadcasted even if session missing
+        ActiveStream.objects.filter(user=user).delete()
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'presence',
+                {
+                    'type': 'streaming_status_update',
+                    'username': user.username,
+                    'is_streaming': False,
+                },
+            )
+        except Exception:
+            pass
+        return Response({'stopped': True})
+    async_to_sync(close_session)(session.session_id)
+    # Clear ActiveStream and broadcast presence
+    ActiveStream.objects.filter(user=user).delete()
+    try:
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'presence',
+            {
+                'type': 'streaming_status_update',
+                'username': user.username,
+                'is_streaming': False,
+            },
+        )
+    except Exception:
+        pass
+    return Response({'stopped': True})
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def webrtc_offer(request):
+    user = request.user
+    offer_sdp = request.data.get('sdp')
+    if not offer_sdp:
+        return Response({'error': 'SDP offer required'}, status=400)
+    session = get_session_by_username(user.username)
+    if not session:
+        return Response({'error': 'No session'}, status=400)
+    from asgiref.sync import async_to_sync
+    try:
+        answer_sdp = async_to_sync(session.handle_offer)(offer_sdp)
+        return Response({'sdp': answer_sdp, 'type': 'answer', 'session_id': session.session_id})
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def listener_offer(request, username):
+    offer_sdp = request.data.get('sdp')
+    if not offer_sdp:
+        return Response({'error': 'SDP offer required'}, status=400)
+    session = get_session_by_username(username)
+    if not session:
+        return Response({'error': 'User not streaming'}, status=400)
+    from asgiref.sync import async_to_sync
+    try:
+        listener_id = f"{request.user.username}_{request.user.id}"
+        answer_sdp = async_to_sync(session.create_listener_connection)(listener_id, offer_sdp)
+        return Response({'sdp': answer_sdp, 'type': 'answer'})
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_recordings(request, username):
+    User = get_user_model()
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+    recs = StreamRecording.objects.filter(owner=user).order_by('-created_at')
+    data = [{
+        'id': r.id,
+        'title': r.title,
+        'file_url': r.file.url if r.file else None,
+        'duration': r.duration,
+        'created_at': r.created_at.isoformat(),
+    } for r in recs]
+    return Response(data)
+
+
+# Backwards-compatible list endpoint mapped in project urls
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def recordings_list(request, username=None):
+    if username is None:
+        username = request.user.username
+    return user_recordings(request, username)
+
+
+# Legacy endpoint placeholder; aiortc pipeline does not use chunk posts
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_audio_chunk(request):
+    return Response({'status': 'ignored'})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def stream_status(request, username):
+    # Prefer DB-backed ActiveStream for status; fallback to in-memory session
+    active = ActiveStream.objects.filter(user__username=username).exists()
+    if not active:
+        session = get_session_by_username(username)
+        active = bool(session)
+    return Response({'active': active})
+    # End

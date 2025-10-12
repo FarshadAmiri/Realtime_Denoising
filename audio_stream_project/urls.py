@@ -33,6 +33,8 @@ urlpatterns = [
     path('api/stream/stop/', stream_views.stop_stream, name='stop_stream'),
     path('api/stream/status/<str:username>/', stream_views.stream_status, name='stream_status'),
     path('api/stream/chunk/', stream_views.save_audio_chunk, name='save_audio_chunk'),
+    path('api/stream/offer/', stream_views.webrtc_offer, name='webrtc_offer'),
+    path('api/stream/listener/<str:username>/offer/', stream_views.listener_offer, name='listener_offer'),
     path('api/recordings/', stream_views.recordings_list, name='recordings_list'),
     path('api/recordings/<str:username>/', stream_views.recordings_list, name='user_recordings_list'),
 ]
