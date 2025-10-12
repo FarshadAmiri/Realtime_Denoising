@@ -1,0 +1,18 @@
+{% extends "core/base.html" %}
+
+{% block title %}Access Denied - Audio Stream{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 4rem auto; text-align: center;">
+    <h1 style="margin-bottom: 1rem; color: #e74c3c;">Access Denied</h1>
+    <p style="margin-bottom: 2rem; color: #666;">
+        You need to be friends with {{ username }} to view their stream and recordings.
+    </p>
+    <a href="{% url 'search_users' %}?q={{ username }}" class="btn btn-primary">
+        Search for {{ username }}
+    </a>
+    <a href="{% url 'main_page' %}" class="btn" style="margin-left: 1rem; background: #95a5a6; color: white;">
+        Go to Home
+    </a>
+</div>
+{% endblock %}
