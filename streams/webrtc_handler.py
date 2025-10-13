@@ -17,6 +17,7 @@ import torch
 from django.conf import settings
 
 from aiortc import MediaStreamTrack  # type: ignore
+from fractions import Fraction
 
 from df import config as df_config
 from df.enhance import enhance
@@ -28,17 +29,21 @@ class ListenerAudioTrack(MediaStreamTrack):
     def __init__(self, queue: asyncio.Queue):
         super().__init__()
         self._queue = queue
+        self._pts = 0
+        self._time_base: Optional[Fraction] = None
 
     async def recv(self):
-        audio_arr, sample_rate, time_base, pts = await self._queue.get()
+        audio_arr, sample_rate = await self._queue.get()
         if audio_arr.ndim == 1:
             audio_arr = audio_arr.reshape(1, -1)
         frame = av.AudioFrame.from_ndarray(audio_arr, format="flt", layout="mono")
         frame.sample_rate = sample_rate
-        if time_base is not None:
-            frame.time_base = time_base
-        if pts is not None:
-            frame.pts = pts
+        if self._time_base is None:
+            self._time_base = Fraction(1, int(sample_rate))
+        frame.time_base = self._time_base
+        frame.pts = self._pts
+        # advance pts by number of samples in frame for pacing
+        self._pts += int(audio_arr.shape[-1])
         return frame
 
 
@@ -64,8 +69,9 @@ class WebRTCSession:
         self._df_model = None
         self._df_state = None
         self._model_sr = None
-        self._chunk_seconds = 2.0
-        self._overlap_seconds = 0.5
+        # Use settings to allow low-latency tuning
+        self._chunk_seconds = float(getattr(settings, 'AUDIO_CHUNK_SECONDS', 0.5))
+        self._overlap_seconds = float(getattr(settings, 'AUDIO_OVERLAP_SECONDS', 0.1))
         self._chunk_frames = None
         self._overlap_frames = None
         self._ramp_up = None
@@ -161,8 +167,8 @@ class WebRTCSession:
                                 dead = []
                                 for lid, q in self.listener_queues.items():
                                     try:
-                                        if q.qsize() < 5:
-                                            q.put_nowait((seg_np.copy(), self._model_sr, None, None))
+                                        if q.qsize() < 10:
+                                            q.put_nowait((seg_np.copy(), self._model_sr))
                                     except Exception:
                                         dead.append(lid)
                                 for lid in dead:
