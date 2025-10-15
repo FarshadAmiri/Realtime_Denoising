@@ -174,3 +174,9 @@ REST_FRAMEWORK = {
 AUDIO_CHUNK_SECONDS = float(os.getenv('AUDIO_CHUNK_SECONDS', '2.0'))
 AUDIO_OVERLAP_SECONDS = float(os.getenv('AUDIO_OVERLAP_SECONDS', '0.5'))
 AUDIO_SAMPLE_RATE = int(os.getenv('AUDIO_SAMPLE_RATE', '48000'))
+"""Target audio sample rate for processing/denoise pipeline."""
+
+# Enable built-in browser audio processing (echoCancellation, noiseSuppression, autoGainControl)
+# Useful to approximate Windows Sound Recorder-like capture quality.
+BROWSER_AUDIO_PROCESSING = os.getenv('BROWSER_AUDIO_PROCESSING', 'true').lower() in ('1', 'true', 'yes', 'on')
+"""Default capture hint to enable browser EC/NS/AGC in getUserMedia."""

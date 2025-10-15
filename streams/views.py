@@ -13,6 +13,7 @@ from .webrtc_handler import create_session, get_session_by_username, close_sessi
 from users.models import Friendship
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.conf import settings
 
 
 @login_required
@@ -60,6 +61,7 @@ def page_listener(request, username):
         'is_owner': is_owner,
         'is_streaming': is_streaming,
         'recordings': recordings,
+        'browser_audio_processing': getattr(settings, 'BROWSER_AUDIO_PROCESSING', True),
     }
     return render(request, 'streams/user_page.html', ctx)
 

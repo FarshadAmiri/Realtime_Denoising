@@ -15,12 +15,15 @@ import av
 import numpy as np
 import torch
 from django.conf import settings
+import time
 
 from aiortc import MediaStreamTrack  # type: ignore
 from fractions import Fraction
 
 from df import config as df_config
 from df.enhance import enhance
+from av.audio.resampler import AudioResampler
+import re
 
 
 class ListenerAudioTrack(MediaStreamTrack):
@@ -31,19 +34,47 @@ class ListenerAudioTrack(MediaStreamTrack):
         self._queue = queue
         self._pts = 0
         self._time_base: Optional[Fraction] = None
+        self._buffer = np.empty(0, dtype=np.float32)
+        self._sample_rate: Optional[int] = None
+        self._frame_len: Optional[int] = None  # samples per 20ms at sample_rate
+        self._t0: Optional[float] = None  # wall clock reference
 
     async def recv(self):
-        audio_arr, sample_rate = await self._queue.get()
-        if audio_arr.ndim == 1:
-            audio_arr = audio_arr.reshape(1, -1)
-        frame = av.AudioFrame.from_ndarray(audio_arr, format="flt", layout="mono")
-        frame.sample_rate = sample_rate
-        if self._time_base is None:
-            self._time_base = Fraction(1, int(sample_rate))
+        # Ensure we have enough samples to produce a ~20ms frame
+        while self._frame_len is None or self._buffer.shape[0] < self._frame_len:
+            chunk, sample_rate = await self._queue.get()
+            if self._sample_rate is None:
+                self._sample_rate = int(sample_rate)
+                self._time_base = Fraction(1, self._sample_rate)
+                self._frame_len = max(1, int(self._sample_rate * 0.02))  # ~20ms
+            # append to buffer
+            self._buffer = np.concatenate([self._buffer, chunk.astype(np.float32)])
+
+        # Slice one frame
+        out = self._buffer[: self._frame_len]
+        self._buffer = self._buffer[self._frame_len :]
+
+        # Convert float32 [-1,1] to int16 for better encoder compatibility
+        out_i16 = np.clip(out * 32767.0, -32768, 32767).astype(np.int16)
+        out_i16 = out_i16.reshape(1, -1)  # mono
+
+        frame = av.AudioFrame.from_ndarray(out_i16, format="s16", layout="mono")
+        frame.sample_rate = self._sample_rate
         frame.time_base = self._time_base
         frame.pts = self._pts
-        # advance pts by number of samples in frame for pacing
-        self._pts += int(audio_arr.shape[-1])
+        self._pts += self._frame_len
+        # Real-time pacing: align to wall clock based on pts / sample_rate
+        if self._t0 is None:
+            self._t0 = time.monotonic()
+        else:
+            target = self._t0 + (frame.pts / self._sample_rate)
+            now = time.monotonic()
+            delay = target - now
+            if delay > 0:
+                try:
+                    await asyncio.sleep(delay)
+                except Exception:
+                    pass
         return frame
 
 
@@ -70,8 +101,8 @@ class WebRTCSession:
         self._df_state = None
         self._model_sr = None
         # Use settings to allow low-latency tuning
-        self._chunk_seconds = float(getattr(settings, 'AUDIO_CHUNK_SECONDS', 0.5))
-        self._overlap_seconds = float(getattr(settings, 'AUDIO_OVERLAP_SECONDS', 0.1))
+        self._chunk_seconds = float(getattr(settings, 'AUDIO_CHUNK_SECONDS', 4))
+        self._overlap_seconds = float(getattr(settings, 'AUDIO_OVERLAP_SECONDS', 0.5))
         self._chunk_frames = None
         self._overlap_frames = None
         self._ramp_up = None
@@ -93,17 +124,14 @@ class WebRTCSession:
         self._model_sr = df_config("sr", 48000, int, section="df")
         self._chunk_frames = int(self._chunk_seconds * self._model_sr)
         self._overlap_frames = int(self._overlap_seconds * self._model_sr)
-        self._ramp_up = (
-            torch.linspace(0.0, 1.0, self._overlap_frames) if self._overlap_frames > 0 else None
-        )
-        self._ramp_down = (
-            torch.linspace(1.0, 0.0, self._overlap_frames) if self._overlap_frames > 0 else None
-        )
+        self._ramp_up = torch.linspace(0.0, 1.0, self._overlap_frames) if self._overlap_frames > 0 else None
+        self._ramp_down = torch.linspace(1.0, 0.0, self._overlap_frames) if self._overlap_frames > 0 else None
 
         # Recording path
         streamed_audios_dir = Path(settings.BASE_DIR) / "streamed_audios"
         streamed_audios_dir.mkdir(parents=True, exist_ok=True)
         self.recording_path = streamed_audios_dir / f"{self.username}_{self.session_id}.wav"
+
 
         @self.pc.on("track")
         async def on_track(track):
@@ -117,13 +145,36 @@ class WebRTCSession:
                 while not self._closed:
                     try:
                         frame = await track.recv()
-                        arr = frame.to_ndarray()
-                        mono = arr[0] if arr.ndim > 1 else arr
-                        if self._recording_sample_rate is None:
-                            self._recording_sample_rate = self._model_sr
-                        pending = np.concatenate([pending, np.asarray(mono, dtype=np.float32)])
+                        # Initialize resampler once per track
+                        if not hasattr(track, '_df_resampler') or track._df_resampler is None:
+                            track._df_resampler = AudioResampler(format='s16', layout='mono', rate=int(self._model_sr))
+                        out_frames = track._df_resampler.resample(frame)
+                        if not isinstance(out_frames, (list, tuple)):
+                            out_frames = [out_frames]
+                        for of in out_frames:
+                            arr = of.to_ndarray()
+                            if arr.ndim == 2:
+                                arr = arr.reshape(-1)
+                            mono = (arr.astype(np.int16).astype(np.float32)) / 32768.0
+                            if self._recording_sample_rate is None:
+                                self._recording_sample_rate = self._model_sr
+                            # If passthrough mode, send frames directly without denoise/chunking
+                            if getattr(settings, 'AUDIO_PASSTHROUGH_ONLY', False):
+                                self._recording_frames.append(mono.copy())
+                                dead = []
+                                for lid, q in self.listener_queues.items():
+                                    try:
+                                        if q.qsize() < 50:
+                                            q.put_nowait((mono.copy(), self._model_sr))
+                                    except Exception:
+                                        dead.append(lid)
+                                for lid in dead:
+                                    self.listener_queues.pop(lid, None)
+                            else:
+                                pending = np.concatenate([pending, mono])
 
-                        while pending.shape[0] >= self._chunk_frames:
+                        # Process as many full chunks as possible
+                        while not getattr(settings, 'AUDIO_PASSTHROUGH_ONLY', False) and pending.shape[0] >= self._chunk_frames:
                             chunk_np = pending[: self._chunk_frames].copy()
                             if self._overlap_frames > 0:
                                 pending = pending[self._chunk_frames - self._overlap_frames :]
@@ -140,12 +191,9 @@ class WebRTCSession:
                             else:
                                 enhanced = raw.clone()
 
+                            # Crossfade with previous tail if overlap
                             segments: list[torch.Tensor] = []
-                            if (
-                                prev_tail is not None
-                                and self._overlap_frames > 0
-                                and self._ramp_up is not None
-                            ):
+                            if prev_tail is not None and self._overlap_frames > 0 and self._ramp_up is not None:
                                 head = enhanced[:, : self._overlap_frames]
                                 cf = prev_tail * self._ramp_down + head * self._ramp_up
                                 segments.append(cf)
@@ -155,12 +203,9 @@ class WebRTCSession:
                             else:
                                 segments.append(enhanced)
 
-                            prev_tail = (
-                                enhanced[:, -self._overlap_frames :]
-                                if self._overlap_frames > 0
-                                else None
-                            )
+                            prev_tail = enhanced[:, -self._overlap_frames :] if self._overlap_frames > 0 else None
 
+                            # Fan out each denoised segment to all current listeners immediately
                             for seg in segments:
                                 seg_np = seg.squeeze(0).numpy().astype(np.float32)
                                 self._recording_frames.append(seg_np.copy())
@@ -177,7 +222,7 @@ class WebRTCSession:
                         print(f"Frame consumption ended: {e}")
                         break
 
-                # Flush pending tail
+                # Flush any remaining audio as a final chunk
                 try:
                     if pending.size > 0:
                         raw = torch.from_numpy(pending.copy()).float().unsqueeze(0)
@@ -193,23 +238,15 @@ class WebRTCSession:
                         if prev_tail is not None and self._overlap_frames and self._overlap_frames > 0:
                             ov = min(self._overlap_frames, enhanced.shape[-1])
                             head = enhanced[:, :ov]
-                            ramp_up = (
-                                torch.linspace(0.0, 1.0, ov) if ov != self._overlap_frames else self._ramp_up
-                            )
-                            ramp_down = (
-                                torch.linspace(1.0, 0.0, ov) if ov != self._overlap_frames else self._ramp_down
-                            )
+                            ramp_up = torch.linspace(0.0, 1.0, ov) if ov != self._overlap_frames else self._ramp_up
+                            ramp_down = torch.linspace(1.0, 0.0, ov) if ov != self._overlap_frames else self._ramp_down
                             cf = prev_tail[:, -ov:] * ramp_down + head * ramp_up
                             self._recording_frames.append(cf.squeeze(0).numpy().astype(np.float32).copy())
                             remainder = enhanced[:, ov:]
                             if remainder.numel() > 0:
-                                self._recording_frames.append(
-                                    remainder.squeeze(0).numpy().astype(np.float32).copy()
-                                )
+                                self._recording_frames.append(remainder.squeeze(0).numpy().astype(np.float32).copy())
                         else:
-                            self._recording_frames.append(
-                                enhanced.squeeze(0).numpy().astype(np.float32).copy()
-                            )
+                            self._recording_frames.append(enhanced.squeeze(0).numpy().astype(np.float32).copy())
                 except Exception as e:
                     print(f"Error flushing pending audio: {e}")
 
@@ -225,7 +262,54 @@ class WebRTCSession:
             RTCSessionDescription(sdp=offer_sdp, type="offer")
         )
         answer = await self.pc.createAnswer()
-        await self.pc.setLocalDescription(answer)
+        # Reuse opus SDP munge to favor higher quality from browser sender
+        def _munge_opus_sdp(sdp: str) -> str:
+            try:
+                lines = sdp.split('\r\n')
+                opus_pt = None
+                for line in lines:
+                    if line.startswith('a=rtpmap:') and 'opus/48000' in line.lower():
+                        try:
+                            opus_pt = line.split(':', 1)[1].split(' ', 1)[0]
+                            break
+                        except Exception:
+                            pass
+                if not opus_pt:
+                    return sdp
+                fmtp_prefix = f'a=fmtp:{opus_pt} '
+                found = False
+                for i, line in enumerate(lines):
+                    if line.startswith(fmtp_prefix):
+                        found = True
+                        params = line[len(fmtp_prefix):]
+                        parts = [p for p in params.split(';') if p]
+                        kv = {}
+                        for p in parts:
+                            if '=' in p:
+                                k, v = p.split('=', 1)
+                                kv[k.strip()] = v.strip()
+                        kv.update({
+                            'stereo': '0',
+                            'sprop-stereo': '0',
+                            'maxaveragebitrate': '192000',
+                            'cbr': '1',
+                            'useinbandfec': '1',
+                            'ptime': '20',
+                            'minptime': '10',
+                        })
+                        new_params = ';'.join([f"{k}={v}" for k, v in kv.items()])
+                        lines[i] = fmtp_prefix + new_params
+                        break
+                if not found:
+                    lines.append(
+                        fmtp_prefix + 'stereo=0;sprop-stereo=0;maxaveragebitrate=192000;cbr=1;useinbandfec=1;ptime=20;minptime=10'
+                    )
+                return '\r\n'.join(lines)
+            except Exception:
+                return sdp
+
+        munged = _munge_opus_sdp(answer.sdp)
+        await self.pc.setLocalDescription(RTCSessionDescription(sdp=munged, type='answer'))
         return self.pc.localDescription.sdp
 
     async def create_listener_connection(self, listener_id: str, offer_sdp: str) -> str:
@@ -237,7 +321,7 @@ class WebRTCSession:
             raise Exception("Stream not yet ready (no audio track received)")
 
         listener_pc = RTCPeerConnection()
-        q: asyncio.Queue = asyncio.Queue(maxsize=5)
+        q: asyncio.Queue = asyncio.Queue(maxsize=50)
         self.listener_queues[listener_id] = q
         listener_track = ListenerAudioTrack(q)
         listener_pc.addTrack(listener_track)
@@ -258,7 +342,55 @@ class WebRTCSession:
             RTCSessionDescription(sdp=offer_sdp, type="offer")
         )
         answer = await listener_pc.createAnswer()
-        await listener_pc.setLocalDescription(answer)
+        # Munge Opus parameters in the SDP answer to improve quality
+        def _munge_opus_sdp(sdp: str) -> str:
+            try:
+                lines = sdp.split('\r\n')
+                opus_pt = None
+                for line in lines:
+                    if line.startswith('a=rtpmap:') and 'opus/48000' in line.lower():
+                        try:
+                            opus_pt = line.split(':', 1)[1].split(' ', 1)[0]
+                            break
+                        except Exception:
+                            pass
+                if not opus_pt:
+                    return sdp
+                fmtp_prefix = f'a=fmtp:{opus_pt} '
+                found = False
+                for i, line in enumerate(lines):
+                    if line.startswith(fmtp_prefix):
+                        found = True
+                        params = line[len(fmtp_prefix):]
+                        # Convert key=value; pairs to dict
+                        parts = [p for p in params.split(';') if p]
+                        kv = {}
+                        for p in parts:
+                            if '=' in p:
+                                k, v = p.split('=', 1)
+                                kv[k.strip()] = v.strip()
+                        kv.update({
+                            'stereo': '0',
+                            'sprop-stereo': '0',
+                            'maxaveragebitrate': '192000',
+                            'cbr': '1',
+                            'useinbandfec': '1',
+                            'ptime': '20',
+                            'minptime': '10',
+                        })
+                        new_params = ';'.join([f"{k}={v}" for k, v in kv.items()])
+                        lines[i] = fmtp_prefix + new_params
+                        break
+                if not found:
+                    lines.append(
+                        fmtp_prefix + 'stereo=0;sprop-stereo=0;maxaveragebitrate=192000;cbr=1;useinbandfec=1;ptime=20;minptime=10'
+                    )
+                return '\r\n'.join(lines)
+            except Exception:
+                return sdp
+
+        munged_sdp = _munge_opus_sdp(answer.sdp)
+        await listener_pc.setLocalDescription(RTCSessionDescription(sdp=munged_sdp, type='answer'))
         return listener_pc.localDescription.sdp
 
     async def _save_recording(self):
@@ -275,6 +407,8 @@ class WebRTCSession:
             from .models import StreamRecording
 
             full_audio = np.concatenate(self._recording_frames)
+            # Clip to valid float range before writing
+            np.clip(full_audio, -1.0, 1.0, out=full_audio)
             sf.write(
                 str(self.recording_path), full_audio, self._recording_sample_rate, subtype="PCM_16"
             )
