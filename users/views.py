@@ -89,6 +89,29 @@ def search_users(request):
     })
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_search_users(request):
+    """JSON search endpoint for real-time search in SPA sidebar."""
+    query = request.GET.get('q', '')
+    results = []
+    if query:
+        users = User.objects.filter(username__icontains=query).exclude(id=request.user.id)[:10]
+        for user in users:
+            sent_request = Friendship.objects.filter(from_user=request.user, to_user=user).first()
+            received_request = Friendship.objects.filter(from_user=user, to_user=request.user).first()
+            status = 'none'
+            if sent_request:
+                status = f'sent_{sent_request.status}'
+            elif received_request:
+                status = f'received_{received_request.status}'
+            results.append({
+                'username': user.username,
+                'friendship_status': status,
+            })
+    return Response({'results': results})
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_friend_request(request):
@@ -164,3 +187,44 @@ def friend_requests(request):
         'received_requests': received,
         'sent_requests': sent,
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_friend_requests(request):
+    """JSON endpoint providing pending friend requests (received and sent)."""
+    received = Friendship.objects.filter(to_user=request.user, status='pending').select_related('from_user')
+    sent = Friendship.objects.filter(from_user=request.user, status='pending').select_related('to_user')
+    data = {
+        'received': [r.from_user.username for r in received],
+        'sent': [r.to_user.username for r in sent],
+    }
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_friends_list(request):
+    """List accepted friends with streaming status for SPA sidebar refresh."""
+    from streams.models import ActiveStream  # local import to avoid circular at module load
+    user = request.user
+    outgoing_ids = list(
+        Friendship.objects.filter(from_user=user, status='accepted').values_list('to_user_id', flat=True)
+    )
+    incoming_ids = list(
+        Friendship.objects.filter(to_user=user, status='accepted').values_list('from_user_id', flat=True)
+    )
+    friend_ids = list(set(outgoing_ids + incoming_ids))
+    users = User.objects.filter(id__in=friend_ids)
+    data = []
+    # Import late to avoid circular; use in-memory sessions as source of truth
+    from streams.webrtc_handler import get_session_by_username
+    from streams.presence_store import is_online
+    for u in users:
+        is_streaming = bool(get_session_by_username(u.username))
+        data.append({
+            'username': u.username,
+            'is_streaming': is_streaming,
+            'is_online': is_online(u.username),
+        })
+    return Response({'friends': data})

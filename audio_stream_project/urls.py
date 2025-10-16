@@ -23,6 +23,9 @@ urlpatterns = [
     path('api/friends/request/', user_views.send_friend_request, name='send_friend_request'),
     path('api/friends/accept/', user_views.accept_friend_request, name='accept_friend_request'),
     path('api/friends/reject/', user_views.reject_friend_request, name='reject_friend_request'),
+    path('api/users/search/', user_views.api_search_users, name='api_search_users'),
+    path('api/friends/requests/', user_views.api_friend_requests, name='api_friend_requests'),
+    path('api/friends/list/', user_views.api_friends_list, name='api_friends_list'),
     
     # Main and user pages
     path('', stream_views.main_page, name='main_page'),
@@ -32,6 +35,7 @@ urlpatterns = [
     path('api/stream/start/', stream_views.start_stream, name='start_stream'),
     path('api/stream/stop/', stream_views.stop_stream, name='stop_stream'),
     path('api/stream/status/<str:username>/', stream_views.stream_status, name='stream_status'),
+    path('api/presence/heartbeat/', stream_views.heartbeat, name='presence_heartbeat'),
     path('api/stream/chunk/', stream_views.save_audio_chunk, name='save_audio_chunk'),
     path('api/stream/offer/', stream_views.webrtc_offer, name='webrtc_offer'),
     path('api/stream/listener/<str:username>/offer/', stream_views.listener_offer, name='listener_offer'),

@@ -1,0 +1,12 @@
+* online-offline status of users should be update in real-time
+
+* when user is not streaming, shouldn't show start listening.
+
+* user cannot not be able to abandon its page and go to other pages when streaming.
+
+* stop listening when user changes page.
+
+* when stream finishes, "Audio stream finished" appears for listeners listeners and listening stops.
++ new saved audio appears for them in saved audios.
+
+* enhance timer visuals

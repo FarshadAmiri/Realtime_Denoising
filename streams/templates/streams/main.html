@@ -4,208 +4,438 @@
 
 {% block extra_css %}
 <style>
-    .main-layout {
-        display: flex;
-        gap: 2rem;
-        height: calc(100vh - 160px);
-    }
-    
-    .friends-sidebar {
-        width: 300px;
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        overflow-y: auto;
-    }
-    
-    .friends-sidebar h2 {
-        margin-bottom: 1rem;
-        font-size: 1.25rem;
-    }
-    
-    .friend-item {
-        padding: 1rem;
-        margin-bottom: 0.75rem;
-        background: #f8f9fa;
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: 2px solid transparent;
-    }
-    
-    .friend-item:hover {
-        background: #e9ecef;
-    }
-    
-    .friend-item.active {
-        border-color: #3498db;
-        background: #e3f2fd;
-    }
-    
-    .friend-name {
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-    }
-    
-    .friend-status {
-        font-size: 0.875rem;
-        color: #666;
-    }
-    
-    .friend-status.streaming {
-        color: #27ae60;
-        font-weight: 600;
-    }
-    
-    .live-badge {
-        display: inline-block;
-        background: #e74c3c;
-        color: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-    }
-    
-    .main-content {
-        flex: 1;
-        background: white;
-        border-radius: 8px;
-        padding: 2rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        overflow-y: auto;
-    }
-    
-    .welcome-message {
-        text-align: center;
-        color: #666;
-        margin-top: 4rem;
-    }
-    
-    .no-friends {
-        text-align: center;
-        color: #666;
-        padding: 2rem;
-    }
+    .layout {
+                display: grid;
+        grid-template-columns: 320px 1fr 0px;
+                gap: 1.5rem;
+                height: calc(100vh - 160px);
+        }
+        .card { background: #fff; border-radius: 12px; }
+        .panel { padding: 1.25rem 1.25rem; }
+        .panel h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #1f2937; }
+        .divider { height: 1px; background: #f0f2f5; margin: 0.75rem 0 1rem; }
+
+        /* Sidebar */
+        .sidebar .you-item { border-left: 4px solid #8b5cf6; background: linear-gradient(90deg, #f5f3ff, #ffffff); }
+        .friend-item { padding: 0.9rem; border-radius: 10px; cursor: pointer; transition: .15s ease; border: 1px solid #eef2f7; margin-bottom: 0.6rem; }
+        .friend-item:hover { background: #f9fafb; }
+        .friend-item.active { outline: 2px solid #3b82f6; background: #eff6ff; }
+        .friend-name { font-weight: 600; color: #111827; }
+    .friend-meta { font-size: .8rem; color: #6b7280; display:flex; align-items:center; gap:6px; }
+    .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+    .live-dot { background:#ef4444; }
+    .online-dot { background:#10b981; }
+    .offline-dot { background:#9ca3af; }
+
+        /* Main content */
+        .content-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: .75rem; }
+        .content-title { font-size:1.25rem; font-weight:700; color:#111827 }
+        .pill { padding:.25rem .5rem; border-radius:999px; font-size:.75rem; }
+    .pill-live { background:#fee2e2; color:#b91c1c; }
+    .pill-online { background:#dcfce7; color:#065f46; }
+        .pill-off { background:#e5e7eb; color:#374151; }
+    .rec-icon { font-size:.85rem; margin-left:.25rem }
+        .controls { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
+        .switch { display:flex; gap:.5rem; align-items:center }
+        .switch input { transform: scale(1.1); }
+        .timer { font-family: monospace; color:#ef4444; font-weight:700 }
+
+        /* Premium buttons */
+        .cta {
+            position: relative;
+            border: none;
+            border-radius: 14px;
+            padding: 0.65rem 0.85rem;
+            font-weight: 600;
+            font-size: 17px;
+            letter-spacing: .3px;
+            color: #fff;
+            cursor: pointer;
+            transition: transform .1s ease, box-shadow .15s ease, filter .2s ease;
+            /* box-shadow: 0 12px 24px rgba(16, 185, 129, .25); */
+            background: linear-gradient(135deg, #1970dc, #2c0084);
+        }
+        .cta:hover { filter: brightness(1.05);}
+        .cta:active { transform: translateY(1px); }
+        .cta.stop { background: linear-gradient(135deg,#ef4444,#dc2626);}
+
+        .toggle-pill {
+            border: none;
+            border-radius: 999px;
+            padding: .7rem 1rem;
+            font-weight: 700;
+            letter-spacing: .2px;
+            cursor: pointer;
+            transition: transform .06s ease, box-shadow .15s ease, filter .2s ease;
+        }
+        .toggle-on { color:#064e3b; background: linear-gradient(180deg,#a7f3d0,#6ee7b7); }
+        .toggle-off { color:#7f1d1d; background: linear-gradient(180deg,#fecaca,#fca5a5);}
+        .toggle-pill:hover { filter: brightness(1.03); }
+        .toggle-pill:active { transform: translateY(1px); }
+
+        .recording-item { padding:.75rem; border-radius:8px; background:#f9fafb; display:flex; justify-content:space-between; align-items:center; border:1px solid #eef2f7; margin-bottom:.5rem }
+        .recording-title { font-weight:600 }
+        .muted { color:#6b7280 }
+
+        /* Right panel */
+        .search { position:relative }
+        .search input { width:100%; padding:.65rem .9rem; border-radius:10px; border:1px solid #e5e7eb; outline:none }
+        .search input:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.1) }
+        .user-chip { padding:.35rem .6rem; background:#f3f4f6; border-radius:999px; font-size:.75rem }
+        .list { max-height:260px; overflow:auto; margin-top:.75rem }
+        .req { display:flex; justify-content:space-between; align-items:center; padding:.5rem; border-radius:8px; border:1px solid #eef2f7; margin-bottom:.5rem }
+
+        .empty { text-align:center; color:#6b7280; padding:1rem }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="main-layout">
-    <div class="friends-sidebar">
-        <h2>Friends</h2>
-        {% if friends %}
-            <div id="friends-list">
-                {% for friend in friends %}
-                <div class="friend-item" data-username="{{ friend.username }}" onclick="selectFriend('{{ friend.username }}')">
-                    <div class="friend-name">{{ friend.username }}</div>
-                    <div class="friend-status {% if friend.is_streaming %}streaming{% endif %}">
-                        {% if friend.is_streaming %}
-                            <span class="live-badge">LIVE</span> Streaming
-                        {% else %}
-                            Offline
-                        {% endif %}
-                    </div>
+<div class="layout">
+    <!-- Sidebar -->
+    <div class="card panel sidebar">
+        <h2>Your Profile</h2>
+            <div class="friend-item you-item" data-username="{{ user.username }}" onclick="selectEntry('{{ user.username }}', true)">
+                <div class="friend-name">{{ user.username }} <span class="user-chip">You</span></div>
+                <div class="friend-meta">
+                    {% if self_is_streaming %}
+                        <span class="dot live-dot"></span>
+                        Streaming <span class="rec-icon">⏺</span>
+                    {% elif self_is_online %}
+                        <span class="dot online-dot"></span>
+                        Online
+                    {% else %}
+                        <span class="dot offline-dot"></span>
+                        Offline
+                    {% endif %}
                 </div>
-                {% endfor %}
             </div>
-        {% else %}
-            <div class="no-friends">
-                <p>No friends yet!</p>
-                <p style="margin-top: 1rem;"><a href="{% url 'search_users' %}" class="btn btn-primary">Find Friends</a></p>
-            </div>
-        {% endif %}
-    </div>
-    
-    <div class="main-content">
-        <div id="user-content">
-            <div class="welcome-message">
-                <h2>Welcome, {{ user.username }}!</h2>
-                <p style="margin-top: 1rem;">Select a friend from the sidebar to view their stream and recordings.</p>
-                <p style="margin-top: 2rem;">
-                    <a href="{% url 'user_page' user.username %}" class="btn btn-primary">Go to My Page</a>
-                </p>
-            </div>
+        <div class="divider"></div>
+        <h2>Friends</h2>
+        <div id="friends-list">
+            {% for friend in friends %}
+                    <div class="friend-item" data-username="{{ friend.username }}" onclick="selectEntry('{{ friend.username }}', false)">
+                        <div class="friend-name">{{ friend.username }}</div>
+                        <div class="friend-meta">
+                            {% if friend.is_streaming %}
+                                <span class="dot live-dot"></span>
+                                Streaming <span class="rec-icon">⏺</span>
+                            {% elif friend.is_online %}
+                                <span class="dot online-dot"></span>
+                                Online
+                            {% else %}
+                                <span class="dot offline-dot"></span>
+                                Offline
+                            {% endif %}
+                        </div>
+                    </div>
+            {% empty %}
+            <div class="empty">No friends yet</div>
+            {% endfor %}
         </div>
+    </div>
+
+    <!-- Main content: dynamic user/friend area -->
+    <div class="card panel">
+        <div class="content-header">
+            <div>
+                <div class="content-title" id="content-title">Select a user</div>
+                <div id="content-sub" class="muted">Stream controls and recordings appear here</div>
+            </div>
+            <div id="live-pill" class="pill pill-off">Offline</div>
+        </div>
+
+        <div id="owner-controls" style="display:none">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding: .75rem 1rem; border:1px solid #eef2f7; border-radius:12px; background:linear-gradient(180deg,#ffffff,#fafafa)">
+                <div style="display:flex; align-items:center; gap:.75rem; flex-wrap:wrap">
+                    <button id="start-btn" class="cta" onclick="startStream()">▶ Start Streaming</button>
+                    <button id="stop-btn" class="cta stop" onclick="stopStream()" style="display:none">■ Stop</button>
+                    <!-- Hidden checkbox preserved for logic; visible toggle is a button -->
+                    <input type="checkbox" id="denoise-toggle" checked style="display:none">
+                    <button id="denoise-btn" type="button" class="toggle-pill toggle-on" onclick="toggleDenoise()" title="Toggle denoise before starting stream">Denoise: ON</button>
+                </div>
+                <div style="display:flex; align-items:center; gap:.5rem">
+                    <span class="timer" id="timer" style="background:#111827; color:#fff; padding:.35rem .6rem; border-radius:8px; min-width:64px; text-align:center">00:00</span>
+                </div>
+            </div>
+            <div id="stream-status" class="muted" style="margin:.5rem 0 1rem"></div>
+        </div>
+
+        <div id="listener-controls" style="display:none">
+            <div class="controls">
+                <button id="listen-btn" class="btn btn-primary" onclick="startListening()">Start Listening</button>
+                <button id="stop-listen-btn" class="btn btn-danger" onclick="stopListening()" style="display:none">Stop Listening</button>
+            </div>
+            <audio id="remote-audio" autoplay controls style="display:none; margin-top:.75rem"></audio>
+            <div id="listen-status" class="muted" style="margin-top:.5rem"></div>
+        </div>
+
+        <div class="divider"></div>
+        <h2>Recordings</h2>
+        <div id="recordings-list" class="list"></div>
+        <div id="no-recordings" class="empty" style="display:none">No recordings yet</div>
+    </div>
+
+    <!-- Right panel: search + requests merged -->
+    <div class="card panel" id="right-panel" style="display:none">
+        <h2>Find Friends</h2>
+        <div class="search">
+            <input id="search-input" type="text" placeholder="Search usernames..." autocomplete="off" />
+        </div>
+        <div id="search-results" class="list"></div>
+        <div class="divider"></div>
+        <h2>Friend Requests</h2>
+        <div id="requests" class="list"></div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // WebSocket for presence updates
-    let presenceSocket = null;
-    
-    function connectPresence() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        presenceSocket = new WebSocket(protocol + '//' + window.location.host + '/ws/presence/');
-        
-        presenceSocket.onopen = function() {
-            console.log('Presence WebSocket connected');
-        };
-        
-        presenceSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            
-            if (data.type === 'streaming_status_update') {
-                updateFriendStatus(data.username, data.is_streaming);
-            } else if (data.type === 'all_statuses') {
-                updateAllStatuses(data.streaming_users);
-            }
-        };
-        
-        presenceSocket.onerror = function(e) {
-            console.error('Presence WebSocket error:', e);
-        };
-        
-        presenceSocket.onclose = function() {
-            console.log('Presence WebSocket closed, reconnecting...');
-            setTimeout(connectPresence, 3000);
-        };
-    }
-    
-    function updateFriendStatus(username, isStreaming) {
-        const friendItem = document.querySelector(`[data-username="${username}"]`);
-        if (!friendItem) return;
-        
-        const statusDiv = friendItem.querySelector('.friend-status');
-        if (isStreaming) {
-            statusDiv.className = 'friend-status streaming';
-            statusDiv.innerHTML = '<span class="live-badge">LIVE</span> Streaming';
-        } else {
-            statusDiv.className = 'friend-status';
-            statusDiv.innerHTML = 'Offline';
+let presenceSocket = null;
+let selectedUsername = null;
+let isOwnerView = false;
+let peerConnection = null;
+let localStream = null;
+let startTime = null;
+let timerInterval = null;
+const currentUser = "{{ user.username }}";
+let browserAudioProcessing = true; // will be set after cfg JSON is loaded in the next script
+const currentOnlineCache = new Map();
+
+function connectPresence() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    presenceSocket = new WebSocket(proto + '//' + location.host + '/ws/presence/');
+    presenceSocket.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === 'streaming_status_update') {
+            updateSidebarStreaming(data.username, data.is_streaming);
+            if (data.username === selectedUsername) updateLivePill({active: data.is_streaming, online: (data.is_streaming ? true : currentOnlineCache.get(data.username) || false)});
         }
+    };
+    presenceSocket.onclose = () => setTimeout(connectPresence, 2000);
+}
+
+function updateSidebarStreaming(username, isStreaming){
+    const meta = document.querySelector(`.friend-item[data-username="${username}"] .friend-meta`);
+    if(!meta) return;
+    if(isStreaming){ meta.innerHTML = `<span class="dot live-dot"></span> Streaming <span class="rec-icon">⏺</span>`; }
+    else {
+        // fallback to online cache or offline
+        const online = currentOnlineCache.get(username) || false;
+        meta.innerHTML = online ? `<span class="dot online-dot"></span> Online` : `<span class="dot offline-dot"></span> Offline`;
     }
-    
-    function updateAllStatuses(streamingUsers) {
-        const friendItems = document.querySelectorAll('.friend-item');
-        friendItems.forEach(item => {
-            const username = item.dataset.username;
-            const isStreaming = streamingUsers.includes(username);
-            updateFriendStatus(username, isStreaming);
-        });
+}
+
+function updateSidebarTri(username, flags){
+    const meta = document.querySelector(`.friend-item[data-username="${username}"] .friend-meta`);
+    if(!meta) return;
+    if(flags.active){ meta.innerHTML = `<span class="dot live-dot"></span> Streaming <span class="rec-icon">⏺</span>`; }
+    else if(flags.online){ meta.innerHTML = `<span class="dot online-dot"></span> Online`; }
+    else { meta.innerHTML = `<span class="dot offline-dot"></span> Offline`; }
+}
+
+function updateLivePill(flags){
+    const pill = document.getElementById('live-pill');
+    if(flags.active){ pill.className = 'pill pill-live'; pill.textContent = 'Streaming ⏺'; }
+    else if(flags.online){ pill.className = 'pill pill-online'; pill.textContent = 'Online'; }
+    else { pill.className = 'pill pill-off'; pill.textContent = 'Offline'; }
+}
+
+function selectEntry(username, isSelf){
+    // Deselect previous
+    document.querySelectorAll('.friend-item').forEach(i=>i.classList.remove('active'));
+    document.querySelector(`.friend-item[data-username="${username}"]`)?.classList.add('active');
+    selectedUsername = username;
+    isOwnerView = isSelf;
+    document.getElementById('content-title').textContent = username;
+    document.getElementById('content-sub').textContent = isSelf ? 'Manage your stream and recordings' : 'Listen live and browse recordings';
+    document.getElementById('owner-controls').style.display = isSelf ? 'block' : 'none';
+    document.getElementById('listener-controls').style.display = isSelf ? 'none' : 'block';
+    cleanupPeer();
+    refreshRecordings();
+    // Live pill initial state via REST
+    fetch(`/api/stream/status/${encodeURIComponent(username)}/`, { credentials: 'same-origin' })
+        .then(r=>r.json()).then(j=>{ currentOnlineCache.set(username, !!j.online); updateLivePill({active: !!j.active, online: !!j.online}); updateSidebarTri(username, {active: !!j.active, online: !!j.online}); });
+}
+
+function cleanupPeer(){
+    try{ if(peerConnection){ peerConnection.getSenders().forEach(s=>s.track&&s.track.stop()); peerConnection.close(); } }catch(e){}
+    peerConnection=null; localStream=null; stopTimer();
+    document.getElementById('remote-audio').style.display='none';
+    document.getElementById('listen-status').textContent='';
+}
+
+function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : null;
+}
+
+async function startStream(){
+    try{
+        document.getElementById('stream-status').textContent='Starting stream...';
+        const denoise = document.getElementById('denoise-toggle').checked;
+        const resp = await fetch('/api/stream/start/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({denoise})});
+        if(!resp.ok) throw new Error('Failed to start stream');
+        localStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:{ideal:1}, sampleRate:{ideal:48000}, echoCancellation:browserAudioProcessing, noiseSuppression:browserAudioProcessing, autoGainControl:browserAudioProcessing}, video:false});
+        peerConnection = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
+        localStream.getTracks().forEach(t=>{ const s=peerConnection.addTrack(t, localStream); try{ const p=s.getParameters(); if(!p.encodings)p.encodings=[{}]; p.encodings[0].maxBitrate=192000; s.setParameters(p);}catch(e){} });
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        await waitForIceGathering(peerConnection);
+        const offerResp = await fetch('/api/stream/offer/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ sdp: peerConnection.localDescription.sdp })});
+        if(!offerResp.ok) throw new Error('Failed to negotiate');
+        const answer = await offerResp.json();
+        await peerConnection.setRemoteDescription({type:'answer', sdp:answer.sdp});
+        document.getElementById('start-btn').style.display='none';
+        document.getElementById('stop-btn').style.display='inline-block';
+        document.getElementById('denoise-toggle').disabled=true;
+        document.getElementById('stream-status').textContent='Streaming...';
+        startTimer();
+    }catch(e){ document.getElementById('stream-status').textContent='Error: '+e.message; }
+}
+
+async function stopStream(){
+    try{
+        cleanupPeer();
+        const resp = await fetch('/api/stream/stop/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({})});
+        if(!resp.ok) throw new Error('Failed to stop stream');
+        document.getElementById('start-btn').style.display='inline-block';
+        document.getElementById('stop-btn').style.display='none';
+        document.getElementById('denoise-toggle').disabled=false;
+        document.getElementById('stream-status').textContent='Stream stopped.';
+        refreshRecordings();
+    }catch(e){ document.getElementById('stream-status').textContent='Error: '+e.message; }
+}
+
+async function startListening(){
+    try{
+        document.getElementById('listen-status').textContent='Connecting...';
+        document.getElementById('listen-btn').style.display='none';
+        document.getElementById('stop-listen-btn').style.display='inline-block';
+        peerConnection = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
+        const remoteAudio = document.getElementById('remote-audio');
+        peerConnection.addEventListener('track', (ev)=>{ if(remoteAudio.srcObject!==ev.streams[0]){ remoteAudio.srcObject = ev.streams[0]; remoteAudio.style.display='block'; const p=remoteAudio.play(); if(p&&p.catch) p.catch(()=>{});} });
+        peerConnection.addTransceiver('audio', { direction:'recvonly' });
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        await waitForIceGathering(peerConnection);
+        const resp = await fetch(`/api/stream/listener/${encodeURIComponent(selectedUsername)}/offer/`, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ sdp: peerConnection.localDescription.sdp })});
+        if(!resp.ok) throw new Error('Failed to negotiate listen connection');
+        const answer = await resp.json();
+        await peerConnection.setRemoteDescription({ type:'answer', sdp: answer.sdp });
+        document.getElementById('listen-status').textContent='Listening to live stream...';
+    }catch(e){ document.getElementById('listen-status').textContent='Error: '+e.message; }
+}
+
+function stopListening(){ cleanupPeer(); document.getElementById('listen-btn').style.display='inline-block'; document.getElementById('stop-listen-btn').style.display='none'; }
+
+function waitForIceGathering(pc){ return new Promise(res=>{ if(pc.iceGatheringState==='complete') res(); else { const fn=()=>{ if(pc.iceGatheringState==='complete'){ pc.removeEventListener('icegatheringstatechange', fn); res(); } }; pc.addEventListener('icegatheringstatechange', fn);} }); }
+
+function startTimer(){ startTime=Date.now(); timerInterval=setInterval(()=>{ const el=Math.floor((Date.now()-startTime)/1000); const m=String(Math.floor(el/60)).padStart(2,'0'); const s=String(el%60).padStart(2,'0'); document.getElementById('timer').textContent=`${m}:${s}`; },1000); }
+function stopTimer(){ if(timerInterval){ clearInterval(timerInterval); timerInterval=null; } document.getElementById('timer').textContent='00:00'; }
+
+async function refreshRecordings(){
+    const list = document.getElementById('recordings-list');
+    const empty = document.getElementById('no-recordings');
+    list.innerHTML=''; empty.style.display='none';
+    if(!selectedUsername){
+        // ensure selection; default to current user
+        selectedUsername = currentUser;
     }
-    
-    function selectFriend(username) {
-        // Mark as active
-        document.querySelectorAll('.friend-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.querySelector(`[data-username="${username}"]`).classList.add('active');
-        
-        // Load friend's page
-        window.location.href = '/user/' + username + '/';
+    const url = `/api/recordings/${encodeURIComponent(selectedUsername)}/`;
+    const resp = await fetch(url, { credentials: 'same-origin' });
+    if(!resp.ok){ empty.textContent='Unable to load recordings'; empty.style.display='block'; console.error('Recordings fetch failed', resp.status); return; }
+    const data = await resp.json();
+    const recs = Array.isArray(data) ? data : (data.results || []);
+    if(!recs.length){ empty.style.display='block'; return; }
+    for(const r of recs){
+        const item = document.createElement('div'); item.className='recording-item';
+        const left = document.createElement('div');
+        const title = document.createElement('div'); title.className='recording-title'; title.textContent = r.title || 'Recording';
+        const meta = document.createElement('div'); meta.className='muted'; meta.textContent = (r.duration?`Duration: ${r.duration}s | `:'') + (r.created_at? new Date(r.created_at).toLocaleString() : '');
+        left.appendChild(title); left.appendChild(meta);
+        const right = document.createElement('div');
+        if(r.file_url){ const audio = document.createElement('audio'); audio.controls=true; audio.preload='none'; const src=document.createElement('source'); src.src=r.file_url; src.type='audio/wav'; audio.appendChild(src); right.appendChild(audio); } else { right.textContent='No file'; right.className='muted'; }
+        item.appendChild(left); item.appendChild(right); list.appendChild(item);
     }
-    
-    // Connect on page load
-    connectPresence();
+}
+
+// Search and requests
+const searchInput = null; // will get by id on load
+async function refreshRequests(){ const r=await fetch('/api/friends/requests/', { credentials: 'same-origin' }); if(!r.ok){ console.error('Requests fetch failed', r.status); return; } const j=await r.json(); const box=document.getElementById('requests'); box.innerHTML=''; if(!(j.received?.length||j.sent?.length)){ box.innerHTML='<div class="empty">No pending requests</div>'; return; } (j.received||[]).forEach(u=>{ const el=document.createElement('div'); el.className='req'; el.innerHTML=`<div>${u}</div><div><button class="btn btn-success" onclick="actReq('accept','${u}')">Accept</button> <button class="btn btn-danger" onclick="actReq('reject','${u}')">Reject</button></div>`; box.appendChild(el); }); (j.sent||[]).forEach(u=>{ const el=document.createElement('div'); el.className='req'; el.innerHTML=`<div>${u}</div><div class="muted">Sent</div>`; box.appendChild(el); }); }
+
+async function actReq(action, username){ const ep = action==='accept' ? '/api/friends/accept/' : '/api/friends/reject/'; await fetch(ep,{method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ username })}); refreshRequests(); refreshFriendsList(); }
+
+async function doSearch(q){ const r=await fetch(`/api/users/search/?q=${encodeURIComponent(q)}`, { credentials: 'same-origin' }); if(!r.ok){ console.error('Search fetch failed', r.status); return; } const j=await r.json(); const list=document.getElementById('search-results'); list.innerHTML=''; if(!(j.results||[]).length){ list.innerHTML='<div class="empty">No users found</div>'; return; } j.results.forEach(it=>{ const row=document.createElement('div'); row.className='req'; row.innerHTML=`<div>${it.username}</div><div>${renderSearchActions(it)}</div>`; list.appendChild(row); }); }
+
+function renderSearchActions(it){ if(it.friendship_status.startsWith('sent_')) return '<span class="muted">Request sent</span>'; if(it.friendship_status.startsWith('received_')) return `<button class="btn btn-success" onclick="actReq('accept','${it.username}')">Accept</button> <button class="btn btn-danger" onclick="actReq('reject','${it.username}')">Reject</button>`; return `<button class="btn btn-primary" onclick="sendReq('${it.username}')">Add</button>`; }
+
+async function sendReq(username){ await fetch('/api/friends/request/',{method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ username })}); doSearch(document.getElementById('search-input').value || ''); refreshRequests(); }
+
+async function refreshFriendsList(){
+    const r=await fetch('/api/friends/list/', { credentials: 'same-origin' }); if(!r.ok){ console.error('Friends list fetch failed', r.status); return; } const j=await r.json(); const box=document.getElementById('friends-list'); box.innerHTML='';
+    (j.friends||[]).forEach(f=>{
+        currentOnlineCache.set(f.username, !!f.is_online);
+        const d=document.createElement('div'); d.className='friend-item'; d.dataset.username=f.username; d.onclick=()=>selectEntry(f.username,false);
+        let statusHTML = '';
+        if(f.is_streaming){ statusHTML = `<span class="dot live-dot"></span> Streaming <span class=\"rec-icon\">⏺</span>`; }
+        else if(f.is_online){ statusHTML = `<span class="dot online-dot"></span> Online`; }
+        else { statusHTML = `<span class="dot offline-dot"></span> Offline`; }
+        d.innerHTML=`<div class=\"friend-name\">${f.username}</div><div class=\"friend-meta\">${statusHTML}</div>`; box.appendChild(d);
+    });
+}
+
+// Inject config safely for JS parsing
+</script>
+<script id="cfg" type="application/json">{"browserAudioProcessing": {{ browser_audio_processing|yesno:"true,false" }}}</script>
+<script>
+// Initialize
+// Read config now that cfg element exists
+try { browserAudioProcessing = JSON.parse(document.getElementById('cfg').textContent).browserAudioProcessing; } catch (e) { /* keep default */ }
+connectPresence();
+document.getElementById('search-input').addEventListener('input', (e)=>{ const q=e.target.value.trim(); if(q.length<1){ document.getElementById('search-results').innerHTML=''; return;} doSearch(q); });
+refreshRequests();
+refreshFriendsList();
+// Select self by default
+selectEntry(currentUser, true);
+// Refresh initial live dots (self + friends) via REST
+fetch(`/api/stream/status/${encodeURIComponent(currentUser)}/`, { credentials: 'same-origin' })
+    .then(r=>r.json()).then(j=>{ currentOnlineCache.set(currentUser, !!j.online); updateSidebarTri(currentUser, {active: !!j.active, online: !!j.online}); });
+
+// Unload safety: stop stream if open
+window.addEventListener('beforeunload', ()=>{ if(isOwnerView && localStream){ navigator.sendBeacon('/api/stream/stop/', JSON.stringify({})); } });
+
+// Toggle right panel on navbar Friends click
+window.addEventListener('toggleFriendsPanel', ()=>{
+    const panel = document.getElementById('right-panel');
+    const layout = document.querySelector('.layout');
+    const isHidden = panel.style.display === 'none';
+    panel.style.display = isHidden ? 'block' : 'none';
+    layout.style.gridTemplateColumns = isHidden ? '320px 1fr 360px' : '320px 1fr 0px';
+});
+
+// Denoise toggle button logic
+function toggleDenoise(){
+    const cb = document.getElementById('denoise-toggle');
+    const btn = document.getElementById('denoise-btn');
+    if (document.getElementById('start-btn').style.display === 'none') return; // already streaming
+    cb.checked = !cb.checked;
+    if(cb.checked){
+        btn.classList.remove('toggle-off');
+        btn.classList.add('toggle-on');
+        btn.textContent = 'Denoise: ON';
+    } else {
+        btn.classList.remove('toggle-on');
+        btn.classList.add('toggle-off');
+        btn.textContent = 'Denoise: OFF';
+    }
+}
+
+// Heartbeat to mark user online
+function sendHeartbeat(){
+    fetch('/api/presence/heartbeat/', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: '{}' }).catch(()=>{});
+}
+sendHeartbeat();
+setInterval(sendHeartbeat, 15000);
 </script>
 {% endblock %}

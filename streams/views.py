@@ -14,12 +14,18 @@ from users.models import Friendship
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.conf import settings
+from .presence_store import set_online, is_online
 
 
 @login_required
 def page_broadcaster(request):
     # Build friends list with streaming status
     user = request.user
+    # Mark viewer online immediately for initial render accuracy
+    try:
+        set_online(user.username)
+    except Exception:
+        pass
     # Friends are accepted relationships in either direction
     outgoing_ids = list(
         Friendship.objects.filter(from_user=user, status='accepted').values_list('to_user_id', flat=True)
@@ -35,9 +41,20 @@ def page_broadcaster(request):
         friends.append({
             'username': fu.username,
             'is_streaming': ActiveStream.objects.filter(user=fu).exists(),
+            'is_online': is_online(fu.username),
         })
 
-    return render(request, 'streams/main.html', { 'friends': friends })
+    # Use in-memory session as the primary source of truth
+    from .webrtc_handler import get_session_by_username
+    self_is_streaming = bool(get_session_by_username(user.username))
+    self_is_online = is_online(user.username)
+
+    return render(request, 'streams/main.html', {
+        'friends': friends,
+        'self_is_streaming': self_is_streaming,
+        'self_is_online': self_is_online,
+        'browser_audio_processing': getattr(settings, 'BROWSER_AUDIO_PROCESSING', True),
+    })
 
 
 @login_required
@@ -74,6 +91,9 @@ def main_page(request):
 
 def user_page(request, username):
     """Serve a simple listener page for the given username."""
+    if request.user.is_authenticated and request.user.username == username:
+        # For own page, send to SPA main page
+        return main_page(request)
     return page_listener(request, username)
 
 
@@ -189,6 +209,27 @@ def listener_offer(request, username):
         return Response({'error': str(e)}, status=500)
 
 
+def _recordings_data_for_user(user):
+    recs = StreamRecording.objects.filter(owner=user).order_by('-created_at')
+    data = []
+    for r in recs:
+        file_url = None
+        if getattr(r, 'file', None):
+            try:
+                if r.file.name and r.file.storage.exists(r.file.name):
+                    file_url = r.file.url
+            except Exception:
+                file_url = None
+        data.append({
+            'id': r.id,
+            'title': r.title,
+            'file_url': file_url,
+            'duration': r.duration,
+            'created_at': r.created_at.isoformat(),
+        })
+    return data
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_recordings(request, username):
@@ -197,15 +238,7 @@ def user_recordings(request, username):
         user = User.objects.get(username=username)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=404)
-    recs = StreamRecording.objects.filter(owner=user).order_by('-created_at')
-    data = [{
-        'id': r.id,
-        'title': r.title,
-        'file_url': r.file.url if r.file else None,
-        'duration': r.duration,
-        'created_at': r.created_at.isoformat(),
-    } for r in recs]
-    return Response(data)
+    return Response(_recordings_data_for_user(user))
 
 
 # Backwards-compatible list endpoint mapped in project urls
@@ -214,7 +247,12 @@ def user_recordings(request, username):
 def recordings_list(request, username=None):
     if username is None:
         username = request.user.username
-    return user_recordings(request, username)
+    User = get_user_model()
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+    return Response(_recordings_data_for_user(user))
 
 
 # Legacy endpoint placeholder; aiortc pipeline does not use chunk posts
@@ -227,10 +265,20 @@ def save_audio_chunk(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def stream_status(request, username):
-    # Prefer DB-backed ActiveStream for status; fallback to in-memory session
-    active = ActiveStream.objects.filter(user__username=username).exists()
+    # Authoritative live status is in-memory session; DB can be stale
+    session = get_session_by_username(username)
+    active = bool(session)
     if not active:
-        session = get_session_by_username(username)
-        active = bool(session)
-    return Response({'active': active})
+        # Best-effort cleanup of stale DB row so other views don't misreport
+        ActiveStream.objects.filter(user__username=username).delete()
+    online = is_online(username)
+    return Response({'active': active, 'online': online})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def heartbeat(request):
+    """Mark current user as online (called periodically by client)."""
+    set_online(request.user.username)
+    return Response({'ok': True})
     # End

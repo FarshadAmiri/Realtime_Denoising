@@ -158,8 +158,8 @@ class WebRTCSession:
                             mono = (arr.astype(np.int16).astype(np.float32)) / 32768.0
                             if self._recording_sample_rate is None:
                                 self._recording_sample_rate = self._model_sr
-                            # If passthrough mode, send frames directly without denoise/chunking
-                            if getattr(settings, 'AUDIO_PASSTHROUGH_ONLY', False):
+                            # If passthrough mode (global) OR denoise disabled, send frames directly without chunking/overlap
+                            if getattr(settings, 'AUDIO_PASSTHROUGH_ONLY', False) or not self.denoise_enabled:
                                 self._recording_frames.append(mono.copy())
                                 dead = []
                                 for lid, q in self.listener_queues.items():
@@ -174,7 +174,7 @@ class WebRTCSession:
                                 pending = np.concatenate([pending, mono])
 
                         # Process as many full chunks as possible
-                        while not getattr(settings, 'AUDIO_PASSTHROUGH_ONLY', False) and pending.shape[0] >= self._chunk_frames:
+                        while getattr(settings, 'AUDIO_PASSTHROUGH_ONLY', False) is False and self.denoise_enabled and pending.shape[0] >= self._chunk_frames:
                             chunk_np = pending[: self._chunk_frames].copy()
                             if self._overlap_frames > 0:
                                 pending = pending[self._chunk_frames - self._overlap_frames :]
@@ -191,22 +191,40 @@ class WebRTCSession:
                             else:
                                 enhanced = raw.clone()
 
-                            # Crossfade with previous tail if overlap
+                            # Overlap-add, streaming-safe:
+                            # - Only output crossfaded head + non-overlapped middle
+                            # - Withhold last overlap as prev_tail for next iteration
                             segments: list[torch.Tensor] = []
-                            if prev_tail is not None and self._overlap_frames > 0 and self._ramp_up is not None:
-                                head = enhanced[:, : self._overlap_frames]
-                                cf = prev_tail * self._ramp_down + head * self._ramp_up
-                                segments.append(cf)
-                                remainder = enhanced[:, self._overlap_frames :]
-                                if remainder.numel() > 0:
-                                    segments.append(remainder)
-                            else:
-                                segments.append(enhanced)
+                            if self._overlap_frames > 0 and self._ramp_up is not None:
+                                total = enhanced.shape[-1]
+                                ov = min(self._overlap_frames, total)
+                                if prev_tail is not None and ov > 0:
+                                    head = enhanced[:, :ov]
+                                    # crossfade overlapped portion with previous tail
+                                    ramp_up = self._ramp_up if ov == self._overlap_frames else torch.linspace(0.0, 1.0, ov)
+                                    ramp_down = self._ramp_down if ov == self._overlap_frames else torch.linspace(1.0, 0.0, ov)
+                                    cf = prev_tail[:, -ov:] * ramp_down + head * ramp_up
+                                    segments.append(cf)
+                                else:
+                                    # First chunk: do not output the last overlap; output up to total - ov
+                                    pass
 
-                            prev_tail = enhanced[:, -self._overlap_frames :] if self._overlap_frames > 0 else None
+                                # Middle (non-overlapped) region: from ov to total - self._overlap_frames
+                                mid_end = max(ov, total - self._overlap_frames)
+                                if mid_end > ov:
+                                    segments.append(enhanced[:, ov:mid_end])
+
+                                # Set new tail as the last overlap region of current chunk (withhold from output now)
+                                prev_tail = enhanced[:, -ov:] if ov > 0 else None
+                            else:
+                                # No overlap: output entire enhanced chunk
+                                segments.append(enhanced)
+                                prev_tail = None
 
                             # Fan out each denoised segment to all current listeners immediately
                             for seg in segments:
+                                if seg.numel() == 0:
+                                    continue
                                 seg_np = seg.squeeze(0).numpy().astype(np.float32)
                                 self._recording_frames.append(seg_np.copy())
                                 dead = []
@@ -235,16 +253,26 @@ class WebRTCSession:
                         else:
                             enhanced = raw.clone()
 
-                        if prev_tail is not None and self._overlap_frames and self._overlap_frames > 0:
-                            ov = min(self._overlap_frames, enhanced.shape[-1])
-                            head = enhanced[:, :ov]
-                            ramp_up = torch.linspace(0.0, 1.0, ov) if ov != self._overlap_frames else self._ramp_up
-                            ramp_down = torch.linspace(1.0, 0.0, ov) if ov != self._overlap_frames else self._ramp_down
-                            cf = prev_tail[:, -ov:] * ramp_down + head * ramp_up
-                            self._recording_frames.append(cf.squeeze(0).numpy().astype(np.float32).copy())
-                            remainder = enhanced[:, ov:]
-                            if remainder.numel() > 0:
-                                self._recording_frames.append(remainder.squeeze(0).numpy().astype(np.float32).copy())
+                        if self._overlap_frames and self._overlap_frames > 0 and enhanced.numel() > 0:
+                            total = enhanced.shape[-1]
+                            ov = min(self._overlap_frames, total)
+                            if prev_tail is not None and ov > 0:
+                                head = enhanced[:, :ov]
+                                ramp_up = self._ramp_up if ov == self._overlap_frames else torch.linspace(0.0, 1.0, ov)
+                                ramp_down = self._ramp_down if ov == self._overlap_frames else torch.linspace(1.0, 0.0, ov)
+                                cf = prev_tail[:, -ov:] * ramp_down + head * ramp_up
+                                self._recording_frames.append(cf.squeeze(0).numpy().astype(np.float32).copy())
+                                # After crossfade at flush, output the remainder AND the last tail since no next chunk will come
+                                remainder = enhanced[:, ov:]
+                                if remainder.numel() > 0:
+                                    self._recording_frames.append(remainder.squeeze(0).numpy().astype(np.float32).copy())
+                            else:
+                                # No prev tail: just output everything
+                                self._recording_frames.append(enhanced.squeeze(0).numpy().astype(np.float32).copy())
+                            # Also output the final tail since stream ends
+                            if ov > 0:
+                                tail = enhanced[:, -ov:]
+                                self._recording_frames.append(tail.squeeze(0).numpy().astype(np.float32).copy())
                         else:
                             self._recording_frames.append(enhanced.squeeze(0).numpy().astype(np.float32).copy())
                 except Exception as e:
