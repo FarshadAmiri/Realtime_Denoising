@@ -10,3 +10,11 @@
 + new saved audio appears for them in saved audios.
 
 * enhance timer visuals
+
+* in friends section, when a friend name appears it should says already friend.
++ if request sent but the other user has not yet accepted, show request sent.
++ if the other user has rejected, the request is dismissed so it should show 
+option of sending friend request.
+
+* you should be able to undo a friend request before the other user action (accept or reject).
+
