@@ -464,7 +464,36 @@ class WebRTCSession:
                     rec.file.save(media_filename, File(f), save=True)
                 return rec
 
-            await create_recording()
+            rec = await create_recording()
+            
+            # Broadcast new recording via presence channel
+            try:
+                from channels.layers import get_channel_layer
+                from asgiref.sync import async_to_sync
+                channel_layer = get_channel_layer()
+                file_url = None
+                try:
+                    if rec.file.name and rec.file.storage.exists(rec.file.name):
+                        file_url = rec.file.url
+                except Exception:
+                    pass
+                # Use async_to_sync since we're in an async context but channel_layer.group_send is sync
+                await channel_layer.group_send(
+                    'presence',
+                    {
+                        'type': 'recording_saved',
+                        'username': self.username,
+                        'recording': {
+                            'id': rec.id,
+                            'title': rec.title,
+                            'file_url': file_url,
+                            'duration': rec.duration,
+                            'created_at': rec.created_at.isoformat(),
+                        },
+                    },
+                )
+            except Exception as e:
+                print(f"Error broadcasting recording saved: {e}")
         except Exception as e:
             print(f"Error saving recording: {e}")
 

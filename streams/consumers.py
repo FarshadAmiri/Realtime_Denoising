@@ -48,6 +48,29 @@ class PresenceConsumer(AsyncWebsocketConsumer):
             'is_streaming': event['is_streaming'],
         }))
     
+    async def online_status_update(self, event):
+        """Broadcast online/offline status updates."""
+        await self.send(text_data=json.dumps({
+            'type': 'online_status_update',
+            'username': event['username'],
+            'is_online': event['is_online'],
+        }))
+    
+    async def stream_ended(self, event):
+        """Broadcast stream ended notification."""
+        await self.send(text_data=json.dumps({
+            'type': 'stream_ended',
+            'username': event['username'],
+        }))
+    
+    async def recording_saved(self, event):
+        """Broadcast new recording saved notification."""
+        await self.send(text_data=json.dumps({
+            'type': 'recording_saved',
+            'username': event['username'],
+            'recording': event.get('recording', {}),
+        }))
+    
     @database_sync_to_async
     def get_streaming_users(self):
         """Get all currently streaming users."""

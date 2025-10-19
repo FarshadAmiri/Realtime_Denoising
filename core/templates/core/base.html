@@ -17,7 +17,7 @@
             color: #333;
         }
         
-        .navbar { background: linear-gradient(90deg,#0f172a,#1f2937); color: white; padding: .9rem 2rem; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 10px 20px rgba(0,0,0,.12); position:sticky; top:0; z-index:50 }
+        .navbar { background: linear-gradient(90deg,#181f42,#2e3d53); color: white; font-size: 18px; font-weight: 500; padding: .9rem 2rem; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 10px 20px rgba(0,0,0,.12); position:sticky; top:0; z-index:50 }
         
         .navbar h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .3px; display:flex; align-items:center; gap:.5rem }
         
@@ -97,11 +97,14 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1><a href="{% url 'main_page' %}" style="color:white; text-decoration:none">🎙️ Audio Stream</a></h1>
+        <h1><a href="{% url 'main_page' %}" style="color:white; text-decoration:none">Voice Stream</a></h1>
         <div class="navbar-links">
             {% if user.is_authenticated %}
+                {% if user.is_superuser or user.profile.user_level == 'admin' %}
+                <a href="{% url 'admin_panel' %}">Admin Panel</a>
+                {% endif %}
                 <a href="#" id="nav-friends">Friends</a>
-                <span>{{ user.username }}</span>
+                <span style="color: #e1ca65">@{{ user.username }}</span>
                 <a href="{% url 'logout' %}">Logout</a>
             {% else %}
                 <a href="{% url 'login' %}">Login</a>

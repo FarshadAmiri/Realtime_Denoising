@@ -6,7 +6,7 @@
 <style>
     .layout {
                 display: grid;
-        grid-template-columns: 320px 1fr 0px;
+        grid-template-columns: 320px 1fr;
                 gap: 1.5rem;
                 height: calc(100vh - 160px);
         }
@@ -17,7 +17,7 @@
 
         /* Sidebar */
         .sidebar .you-item { border: 2px ;background: linear-gradient(90deg, #d9d1ff, #ffc7c7); }
-        .friend-item { padding: 0.9rem; border-radius: 10px; cursor: pointer; transition: .15s ease; border: 1px solid #eef2f7; margin-bottom: 0.6rem; }
+        .friend-item { padding: 0.9rem; border-radius: 10px; cursor: pointer; transition: .15s ease; border: 1px solid #eef2f7; margin-bottom: 0.6rem; position: relative; display: flex; justify-content: space-between; align-items: center; }
         .friend-item:hover { background: #f3f3f3; }
         .friend-item.active { outline: 2px solid #3b82f6; background: #eff6ff; }
         .you-item.active { background: linear-gradient(90deg, #d9d1ff, #ffc7c7); }
@@ -28,6 +28,15 @@
     .live-dot { background:#ef4444; }
     .online-dot { background:#10b981; }
     .offline-dot { background:#9ca3af; }
+    .friend-options-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #6b7280; padding: 0.25rem 0.5rem; transition: color 0.15s ease; position: relative; }
+    .friend-options-btn:hover { color: #111827; }
+    .friend-info { flex: 1; }
+    .friend-options-menu { display: none; position: absolute; right: 0; top: 100%; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); min-width: 120px; z-index: 100; }
+    .friend-options-menu.active { display: block; }
+    .friend-options-menu-item { padding: 0.5rem 0.75rem; cursor: pointer; transition: background 0.15s ease; font-size: 0.875rem; color: #111827; }
+    .friend-options-menu-item:hover { background: #f3f4f6; }
+    .friend-options-menu-item.danger { color: #ef4444; }
+    .friend-options-menu-item.danger:hover { background: #fee2e2; }
 
         /* Main content */
         .content-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: .75rem; }
@@ -61,6 +70,24 @@
         .cta:active { transform: translateY(1px); }
         .cta.stop { background: linear-gradient(135deg,#ef4444,#dc2626);}
 
+        .cta-listen {
+            position: relative;
+            border: none;
+            border-radius: 14px;
+            padding: 0.65rem 0.85rem;
+            font-weight: 600;
+            font-size: 17px;
+            letter-spacing: .3px;
+            color: #fff;
+            cursor: pointer;
+            transition: transform .1s ease, box-shadow .15s ease, filter .2s ease;
+            /* box-shadow: 0 12px 24px rgba(16, 185, 129, .25); */
+            background: linear-gradient(135deg, #04b8a0, #1d9494);
+        }
+        .cta-listen:hover { filter: brightness(1.05);}
+        .cta-listen:active { transform: translateY(1px); }
+        .cta-listen.stop { background: linear-gradient(135deg,#ef6344,#dc4726);}
+
         .toggle-pill {
             border: none;
             border-radius: 999px;
@@ -88,6 +115,24 @@
         .req { display:flex; justify-content:space-between; align-items:center; padding:.5rem; border-radius:8px; border:1px solid #eef2f7; margin-bottom:.5rem }
 
         .empty { text-align:center; color:#6b7280; padding:1rem }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: #fff; border-radius: 16px; padding: 1.5rem; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal-title { font-size: 1.25rem; font-weight: 700; color: #111827; margin-bottom: 0.75rem; }
+        .modal-text { color: #6b7280; margin-bottom: 1.5rem; }
+        .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+        .modal-btn { border: none; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; transition: filter 0.15s ease; }
+        .modal-btn:hover { filter: brightness(0.95); }
+        .modal-btn-cancel { background: #e5e7eb; color: #374151; }
+        .modal-btn-danger { background: #ef4444; color: #fff; }
+        
+        /* Friends Modal */
+        .friends-modal-box { background: #fff; border-radius: 16px; padding: 1.5rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .friends-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .friends-modal-close { background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer; padding: 0; transition: color 0.15s ease; }
+        .friends-modal-close:hover { color: #111827; }
 </style>
 {% endblock %}
 
@@ -112,22 +157,30 @@
                 </div>
             </div>
         <div class="divider"></div>
-        <h2>Friends</h2>
+        <h2>{% if user.is_superuser or user.profile.user_level == 'admin' %}Users{% else %}Friends{% endif %}</h2>
         <div id="friends-list">
             {% for friend in friends %}
-                    <div class="friend-item" data-username="{{ friend.username }}" onclick="selectEntry('{{ friend.username }}', false)">
-                        <div class="friend-name">{{ friend.username }}</div>
-                        <div class="friend-meta">
-                            {% if friend.is_streaming %}
-                                <span class="dot live-dot"></span>
-                                Streaming <span class="rec-icon">⏺</span>
-                            {% elif friend.is_online %}
-                                <span class="dot online-dot"></span>
-                                Online
-                            {% else %}
-                                <span class="dot offline-dot"></span>
-                                Offline
-                            {% endif %}
+                    <div class="friend-item" data-username="{{ friend.username }}">
+                        <div class="friend-info" onclick="selectEntry('{{ friend.username }}', false)">
+                            <div class="friend-name">{{ friend.username }}</div>
+                            <div class="friend-meta">
+                                {% if friend.is_streaming %}
+                                    <span class="dot live-dot"></span>
+                                    Streaming <span class="rec-icon">⏺</span>
+                                {% elif friend.is_online %}
+                                    <span class="dot online-dot"></span>
+                                    Online
+                                {% else %}
+                                    <span class="dot offline-dot"></span>
+                                    Offline
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div style="position: relative;">
+                            <button class="friend-options-btn" onclick="event.stopPropagation(); toggleFriendMenu('{{ friend.username }}')">⋮</button>
+                            <div class="friend-options-menu" id="friend-menu-{{ friend.username }}">
+                                <div class="friend-options-menu-item danger" onclick="event.stopPropagation(); showUnfriendModal('{{ friend.username }}')">Unfriend</div>
+                            </div>
                         </div>
                     </div>
             {% empty %}
@@ -147,6 +200,7 @@
         </div>
 
         <div id="owner-controls" style="display:none">
+            {% if can_stream %}
             <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding: .75rem 1rem; border:1px solid #eef2f7; border-radius:12px; background:linear-gradient(180deg,#ffffff,#fafafa)">
                 <div style="display:flex; align-items:center; gap:.75rem; flex-wrap:wrap">
                     <button id="start-btn" class="cta" onclick="startStream()">▶ Start Streaming</button>
@@ -156,16 +210,22 @@
                     <button id="denoise-btn" type="button" class="toggle-pill toggle-on" onclick="toggleDenoise()" title="Toggle denoise before starting stream">Denoise: ON</button>
                 </div>
                 <div style="display:flex; align-items:center; gap:.5rem">
-                    <span class="timer" id="timer" style="background:#111827; color:#fff; padding:.35rem .6rem; border-radius:8px; min-width:64px; text-align:center">00:00</span>
+                    <span class="timer" id="timer" style="background:#64676e; font-size: 17px;color:#fff; padding:.35rem .6rem; border-radius:8px; min-width:64px; text-align:center">00:00</span>
                 </div>
             </div>
             <div id="stream-status" class="muted" style="margin:.5rem 0 1rem"></div>
+            {% else %}
+            <div style="padding: 1rem; border:1px solid #fee2e2; border-radius:12px; background:#fef2f2; color:#991b1b; text-align:center;">
+                <strong>⚠ Streaming Disabled</strong><br>
+                <span style="font-size:0.875rem;">Your account does not have permission to stream. Please contact an administrator.</span>
+            </div>
+            {% endif %}
         </div>
 
         <div id="listener-controls" style="display:none">
             <div class="controls">
-                <button id="listen-btn" class="btn btn-primary" onclick="startListening()">Start Listening</button>
-                <button id="stop-listen-btn" class="btn btn-danger" onclick="stopListening()" style="display:none">Stop Listening</button>
+                <button id="listen-btn" class="cta-listen" onclick="startListening()">Start Listening</button>
+                <button id="stop-listen-btn" class="cta-listen stop" onclick="stopListening()" style="display:none">Stop Listening</button>
             </div>
             <audio id="remote-audio" autoplay controls style="display:none; margin-top:.75rem"></audio>
             <div id="listen-status" class="muted" style="margin-top:.5rem"></div>
@@ -177,18 +237,42 @@
         <div id="no-recordings" class="empty" style="display:none">No recordings yet</div>
     </div>
 
-    <!-- Right panel: search + requests merged -->
-    <div class="card panel" id="right-panel" style="display:none">
-        <h2>Find Friends</h2>
+</div>
+
+<!-- Friends Modal -->
+<div id="friends-modal" class="modal-overlay" onclick="if(event.target === this) closeFriendsModal()">
+    <div class="friends-modal-box">
+        <div class="friends-modal-header">
+            <h2 style="margin: 0;">Friends</h2>
+            <button class="friends-modal-close" onclick="closeFriendsModal()">&times;</button>
+        </div>
+        <div class="divider" style="margin: 0.5rem 0 1rem;"></div>
+        
+        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Find Friends</h2>
         <div class="search">
             <input id="search-input" type="text" placeholder="Search usernames..." autocomplete="off" />
         </div>
         <div id="search-results" class="list"></div>
+        
         <div class="divider"></div>
-        <h2>Friend Requests</h2>
+        
+        <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">Friend Requests</h2>
         <div id="requests" class="list"></div>
     </div>
 </div>
+
+<!-- Unfriend Confirmation Modal -->
+<div id="unfriend-modal" class="modal-overlay" onclick="if(event.target === this) closeUnfriendModal()">
+    <div class="modal-box">
+        <div class="modal-title">Unfriend User</div>
+        <div class="modal-text" id="unfriend-modal-text">Are you sure you want to unfriend <strong id="unfriend-username"></strong>?</div>
+        <div class="modal-actions">
+            <button class="modal-btn modal-btn-cancel" onclick="closeUnfriendModal()">Cancel</button>
+            <button class="modal-btn modal-btn-danger" onclick="confirmUnfriend()">Unfriend</button>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -211,7 +295,38 @@ function connectPresence() {
         const data = JSON.parse(e.data);
         if (data.type === 'streaming_status_update') {
             updateSidebarStreaming(data.username, data.is_streaming);
-            if (data.username === selectedUsername) updateLivePill({active: data.is_streaming, online: (data.is_streaming ? true : currentOnlineCache.get(data.username) || false)});
+            if (data.username === selectedUsername) {
+                updateLivePill({active: data.is_streaming, online: (data.is_streaming ? true : currentOnlineCache.get(data.username) || false)});
+                // Update listener controls visibility based on streaming status
+                if (!isOwnerView) {
+                    updateListenerControlsVisibility(data.is_streaming);
+                }
+            }
+        } else if (data.type === 'online_status_update') {
+            currentOnlineCache.set(data.username, data.is_online);
+            // If not streaming, update sidebar to show online/offline
+            const meta = document.querySelector(`.friend-item[data-username="${data.username}"] .friend-meta`);
+            if (meta && !meta.innerHTML.includes('Streaming')) {
+                meta.innerHTML = data.is_online ? `<span class="dot online-dot"></span> Online` : `<span class="dot offline-dot"></span> Offline`;
+            }
+            if (data.username === selectedUsername && !isOwnerView) {
+                updateLivePill({active: false, online: data.is_online});
+            }
+        } else if (data.type === 'stream_ended') {
+            // If listener is watching this stream, show message and stop
+            if (data.username === selectedUsername && !isOwnerView && peerConnection) {
+                document.getElementById('listen-status').textContent = 'Audio stream finished.';
+                document.getElementById('listen-status').style.color = '#ef4444';
+                setTimeout(() => {
+                    stopListening();
+                    document.getElementById('listen-status').style.color = '';
+                }, 3000);
+            }
+        } else if (data.type === 'recording_saved') {
+            // If viewing this user's page, add new recording without refresh
+            if (data.username === selectedUsername && data.recording) {
+                addRecordingToList(data.recording);
+            }
         }
     };
     presenceSocket.onclose = () => setTimeout(connectPresence, 2000);
@@ -228,12 +343,78 @@ function updateSidebarStreaming(username, isStreaming){
     }
 }
 
+function updateListenerControlsVisibility(isStreaming) {
+    const listenBtn = document.getElementById('listen-btn');
+    const listenStatus = document.getElementById('listen-status');
+    if (isStreaming) {
+        listenBtn.style.display = 'inline-block';
+        if (listenStatus.textContent.includes('not streaming')) {
+            listenStatus.textContent = '';
+        }
+    } else {
+        listenBtn.style.display = 'none';
+        if (!peerConnection) {
+            listenStatus.textContent = 'User is not currently streaming.';
+            listenStatus.style.color = '#6b7280';
+            listenStatus.style.fontWeight = 600;
+        }
+    }
+}
+
+function addRecordingToList(recording) {
+    const list = document.getElementById('recordings-list');
+    const empty = document.getElementById('no-recordings');
+    empty.style.display = 'none';
+    
+    const item = document.createElement('div');
+    item.className = 'recording-item';
+    const left = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'recording-title';
+    title.textContent = recording.title || 'Recording';
+    const meta = document.createElement('div');
+    meta.className = 'muted';
+    meta.textContent = (recording.duration ? `Duration: ${recording.duration}s | ` : '') + (recording.created_at ? new Date(recording.created_at).toLocaleString() : '');
+    left.appendChild(title);
+    left.appendChild(meta);
+    const right = document.createElement('div');
+    if (recording.file_url) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.preload = 'none';
+        const src = document.createElement('source');
+        src.src = recording.file_url;
+        src.type = 'audio/wav';
+        audio.appendChild(src);
+        right.appendChild(audio);
+    } else {
+        right.textContent = 'No file';
+        right.className = 'muted';
+    }
+    item.appendChild(left);
+    item.appendChild(right);
+    // Insert at the top (newest first)
+    list.insertBefore(item, list.firstChild);
+}
+
 function updateSidebarTri(username, flags){
     const meta = document.querySelector(`.friend-item[data-username="${username}"] .friend-meta`);
-    if(!meta) return;
-    if(flags.active){ meta.innerHTML = `<span class="dot live-dot"></span> Streaming <span class="rec-icon">⏺</span>`; }
-    else if(flags.online){ meta.innerHTML = `<span class="dot online-dot"></span> Online`; }
-    else { meta.innerHTML = `<span class="dot offline-dot"></span> Offline`; }
+    if(!meta) {
+        console.log(`[updateSidebarTri] No meta element found for ${username}`);
+        return;
+    }
+    let newHTML;
+    if(flags.active){ 
+        newHTML = `<span class="dot live-dot"></span> Streaming <span class="rec-icon">⏺</span>`;
+    } else if(flags.online){ 
+        newHTML = `<span class="dot online-dot"></span> Online`;
+    } else { 
+        newHTML = `<span class="dot offline-dot"></span> Offline`;
+    }
+    if (meta.innerHTML !== newHTML) {
+        console.log(`[updateSidebarTri] Updating ${username}: active=${flags.active}, online=${flags.online}`);
+        meta.innerHTML = newHTML;
+    }
 }
 
 function updateLivePill(flags){
@@ -244,6 +425,17 @@ function updateLivePill(flags){
 }
 
 function selectEntry(username, isSelf){
+    // Prevent navigation if currently broadcasting
+    if (localStream && !isSelf) {
+        alert('Please stop your stream before navigating to another page.');
+        return;
+    }
+    
+    // Auto-stop listening when switching pages
+    if (peerConnection && !isOwnerView) {
+        stopListening();
+    }
+    
     // Deselect previous
     document.querySelectorAll('.friend-item').forEach(i=>i.classList.remove('active'));
     document.querySelector(`.friend-item[data-username="${username}"]`)?.classList.add('active');
@@ -255,9 +447,17 @@ function selectEntry(username, isSelf){
     document.getElementById('listener-controls').style.display = isSelf ? 'none' : 'block';
     cleanupPeer();
     refreshRecordings();
-    // Live pill initial state via REST
+    // Live pill initial state via REST and update listener controls
     fetch(`/api/stream/status/${encodeURIComponent(username)}/`, { credentials: 'same-origin' })
-        .then(r=>r.json()).then(j=>{ currentOnlineCache.set(username, !!j.online); updateLivePill({active: !!j.active, online: !!j.online}); updateSidebarTri(username, {active: !!j.active, online: !!j.online}); });
+        .then(r=>r.json()).then(j=>{ 
+            currentOnlineCache.set(username, !!j.online); 
+            updateLivePill({active: !!j.active, online: !!j.online}); 
+            updateSidebarTri(username, {active: !!j.active, online: !!j.online}); 
+            // For listener view, hide/show controls based on streaming status
+            if (!isSelf) {
+                updateListenerControlsVisibility(!!j.active);
+            }
+        });
 }
 
 function cleanupPeer(){
@@ -364,28 +564,98 @@ async function refreshRecordings(){
 
 // Search and requests
 const searchInput = null; // will get by id on load
-async function refreshRequests(){ const r=await fetch('/api/friends/requests/', { credentials: 'same-origin' }); if(!r.ok){ console.error('Requests fetch failed', r.status); return; } const j=await r.json(); const box=document.getElementById('requests'); box.innerHTML=''; if(!(j.received?.length||j.sent?.length)){ box.innerHTML='<div class="empty">No pending requests</div>'; return; } (j.received||[]).forEach(u=>{ const el=document.createElement('div'); el.className='req'; el.innerHTML=`<div>${u}</div><div><button class="btn btn-success" onclick="actReq('accept','${u}')">Accept</button> <button class="btn btn-danger" onclick="actReq('reject','${u}')">Reject</button></div>`; box.appendChild(el); }); (j.sent||[]).forEach(u=>{ const el=document.createElement('div'); el.className='req'; el.innerHTML=`<div>${u}</div><div class="muted">Sent</div>`; box.appendChild(el); }); }
+async function refreshRequests(){ const r=await fetch('/api/friends/requests/', { credentials: 'same-origin' }); if(!r.ok){ console.error('Requests fetch failed', r.status); return; } const j=await r.json(); const box=document.getElementById('requests'); box.innerHTML=''; if(!(j.received?.length||j.sent?.length)){ box.innerHTML='<div class="empty">No pending requests</div>'; return; } (j.received||[]).forEach(u=>{ const el=document.createElement('div'); el.className='req'; el.innerHTML=`<div>${u}</div><div><button class="btn btn-success" style="padding:0.35rem 0.75rem;" onclick="actReq('accept','${u}')">Accept</button> <button class="btn btn-danger" style="padding:0.35rem 0.75rem;" onclick="actReq('reject','${u}')">Reject</button></div>`; box.appendChild(el); }); (j.sent||[]).forEach(u=>{ const el=document.createElement('div'); el.className='req'; el.innerHTML=`<div>${u}<div class="muted" style="font-size:0.75rem;margin-top:0.15rem;">Request Sent</div></div><div><button class="btn btn-danger" style="padding:0.35rem 0.75rem;" onclick="undoReq('${u}')">Undo Request</button></div>`; box.appendChild(el); }); }
 
 async function actReq(action, username){ const ep = action==='accept' ? '/api/friends/accept/' : '/api/friends/reject/'; await fetch(ep,{method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ username })}); refreshRequests(); refreshFriendsList(); }
 
-async function doSearch(q){ const r=await fetch(`/api/users/search/?q=${encodeURIComponent(q)}`, { credentials: 'same-origin' }); if(!r.ok){ console.error('Search fetch failed', r.status); return; } const j=await r.json(); const list=document.getElementById('search-results'); list.innerHTML=''; if(!(j.results||[]).length){ list.innerHTML='<div class="empty">No users found</div>'; return; } j.results.forEach(it=>{ const row=document.createElement('div'); row.className='req'; row.innerHTML=`<div>${it.username}</div><div>${renderSearchActions(it)}</div>`; list.appendChild(row); }); }
+async function doSearch(q){ const r=await fetch(`/api/users/search/?q=${encodeURIComponent(q)}`, { credentials: 'same-origin' }); if(!r.ok){ console.error('Search fetch failed', r.status); return; } const j=await r.json(); const list=document.getElementById('search-results'); list.innerHTML=''; if(!(j.results||[]).length){ list.innerHTML='<div class="empty">No users found</div>'; return; } j.results.forEach(it=>{ const row=document.createElement('div'); row.className='req'; row.innerHTML=`<div>${it.username}${it.friendship_status === 'sent_pending' ? '<div class="muted" style="font-size:0.75rem;margin-top:0.15rem;">Request Sent</div>' : ''}</div><div>${renderSearchActions(it)}</div>`; list.appendChild(row); }); }
 
-function renderSearchActions(it){ if(it.friendship_status.startsWith('sent_')) return '<span class="muted">Request sent</span>'; if(it.friendship_status.startsWith('received_')) return `<button class="btn btn-success" onclick="actReq('accept','${it.username}')">Accept</button> <button class="btn btn-danger" onclick="actReq('reject','${it.username}')">Reject</button>`; return `<button class="btn btn-primary" onclick="sendReq('${it.username}')">Add</button>`; }
+function renderSearchActions(it){ 
+    if(it.friendship_status === 'sent_pending') return '<button class="btn btn-danger" style="padding:0.35rem 0.75rem;" onclick="undoReq(\''+it.username+'\')">Undo Request</button>'; 
+    if(it.friendship_status === 'sent_accepted' || it.friendship_status === 'received_accepted') return '<span class="muted" style="color:#10b981;font-weight:600;"><span style="font-size:1.1em;">✓</span> Already Friends</span>'; 
+    if(it.friendship_status.startsWith('received_')) return `<button class="btn btn-success" style="padding:0.35rem 0.75rem;" onclick="actReq('accept','${it.username}')">Accept</button> <button class="btn btn-danger" style="padding:0.35rem 0.75rem;" onclick="actReq('reject','${it.username}')">Reject</button>`; 
+    return `<button class="btn btn-primary" style="padding:0.35rem 0.75rem;" onclick="sendReq('${it.username}')">Add</button>`; 
+}
 
 async function sendReq(username){ await fetch('/api/friends/request/',{method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ username })}); doSearch(document.getElementById('search-input').value || ''); refreshRequests(); }
+
+async function undoReq(username){ 
+    await fetch('/api/friends/undo/',{method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ username })}); 
+    const searchVal = document.getElementById('search-input').value || '';
+    if(searchVal) doSearch(searchVal); 
+    refreshRequests(); 
+}
 
 async function refreshFriendsList(){
     const r=await fetch('/api/friends/list/', { credentials: 'same-origin' }); if(!r.ok){ console.error('Friends list fetch failed', r.status); return; } const j=await r.json(); const box=document.getElementById('friends-list'); box.innerHTML='';
     (j.friends||[]).forEach(f=>{
         currentOnlineCache.set(f.username, !!f.is_online);
-        const d=document.createElement('div'); d.className='friend-item'; d.dataset.username=f.username; d.onclick=()=>selectEntry(f.username,false);
+        const d=document.createElement('div'); d.className='friend-item'; d.dataset.username=f.username;
         let statusHTML = '';
         if(f.is_streaming){ statusHTML = `<span class="dot live-dot"></span> Streaming <span class=\"rec-icon\">⏺</span>`; }
         else if(f.is_online){ statusHTML = `<span class="dot online-dot"></span> Online`; }
         else { statusHTML = `<span class="dot offline-dot"></span> Offline`; }
-        d.innerHTML=`<div class=\"friend-name\">${f.username}</div><div class=\"friend-meta\">${statusHTML}</div>`; box.appendChild(d);
+        d.innerHTML=`<div class=\"friend-info\" onclick=\"selectEntry('${f.username}', false)\"><div class=\"friend-name\">${f.username}</div><div class=\"friend-meta\">${statusHTML}</div></div><div style=\"position: relative;\"><button class=\"friend-options-btn\" onclick=\"event.stopPropagation(); toggleFriendMenu('${f.username}')\">⋮</button><div class=\"friend-options-menu\" id=\"friend-menu-${f.username}\"><div class=\"friend-options-menu-item danger\" onclick=\"event.stopPropagation(); showUnfriendModal('${f.username}')\">Unfriend</div></div></div>`; 
+        box.appendChild(d);
     });
 }
+
+let unfriendTargetUsername = null;
+
+function showUnfriendModal(username) {
+    unfriendTargetUsername = username;
+    document.getElementById('unfriend-username').textContent = username;
+    document.getElementById('unfriend-modal').classList.add('active');
+}
+
+function closeUnfriendModal() {
+    document.getElementById('unfriend-modal').classList.remove('active');
+    unfriendTargetUsername = null;
+}
+
+async function confirmUnfriend() {
+    if (!unfriendTargetUsername) return;
+    try {
+        const resp = await fetch('/api/friends/unfriend/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ username: unfriendTargetUsername })
+        });
+        if (!resp.ok) throw new Error('Failed to unfriend');
+        closeUnfriendModal();
+        // If viewing the unfriended user's page, switch back to self
+        if (selectedUsername === unfriendTargetUsername) {
+            selectEntry(currentUser, true);
+        }
+        refreshFriendsList();
+    } catch (e) {
+        alert('Error: ' + e.message);
+        closeUnfriendModal();
+    }
+}
+
+function toggleFriendMenu(username) {
+    const menu = document.getElementById('friend-menu-' + username);
+    const isActive = menu.classList.contains('active');
+    
+    // Close all other menus first
+    document.querySelectorAll('.friend-options-menu').forEach(m => m.classList.remove('active'));
+    
+    // Toggle current menu
+    if (!isActive) {
+        menu.classList.add('active');
+    }
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.friend-options-btn') && !e.target.closest('.friend-options-menu')) {
+        document.querySelectorAll('.friend-options-menu').forEach(m => m.classList.remove('active'));
+    }
+});
 
 // Inject config safely for JS parsing
 </script>
@@ -407,14 +677,23 @@ fetch(`/api/stream/status/${encodeURIComponent(currentUser)}/`, { credentials: '
 // Unload safety: stop stream if open
 window.addEventListener('beforeunload', ()=>{ if(isOwnerView && localStream){ navigator.sendBeacon('/api/stream/stop/', JSON.stringify({})); } });
 
-// Toggle right panel on navbar Friends click
+// Open friends modal on navbar Friends click
 window.addEventListener('toggleFriendsPanel', ()=>{
-    const panel = document.getElementById('right-panel');
-    const layout = document.querySelector('.layout');
-    const isHidden = panel.style.display === 'none';
-    panel.style.display = isHidden ? 'block' : 'none';
-    layout.style.gridTemplateColumns = isHidden ? '320px 1fr 360px' : '320px 1fr 0px';
+    openFriendsModal();
 });
+
+function openFriendsModal() {
+    document.getElementById('friends-modal').classList.add('active');
+    // Refresh data when modal opens
+    refreshRequests();
+}
+
+function closeFriendsModal() {
+    document.getElementById('friends-modal').classList.remove('active');
+    // Clear search when closing
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-results').innerHTML = '';
+}
 
 // Denoise toggle button logic
 function toggleDenoise(){
@@ -439,5 +718,66 @@ function sendHeartbeat(){
 }
 sendHeartbeat();
 setInterval(sendHeartbeat, 15000);
+
+// Periodic friend status refresh every 10 seconds
+async function refreshFriendStatuses() {
+    try {
+        console.log('[Status Refresh] Starting status refresh...');
+        
+        // Refresh friends list to get latest online/streaming status
+        const r = await fetch('/api/friends/list/', { credentials: 'same-origin' });
+        if (!r.ok) {
+            console.error('[Status Refresh] Friends list fetch failed:', r.status);
+            return;
+        }
+        const j = await r.json();
+        console.log('[Status Refresh] Got friends data:', j);
+        
+        (j.friends || []).forEach(f => {
+            const wasOnline = currentOnlineCache.get(f.username);
+            currentOnlineCache.set(f.username, !!f.is_online);
+            // Update sidebar status for each friend
+            updateSidebarTri(f.username, {active: !!f.is_streaming, online: !!f.is_online});
+            if (wasOnline !== !!f.is_online) {
+                console.log(`[Status Refresh] ${f.username} changed: ${wasOnline} -> ${f.is_online}`);
+            }
+        });
+        
+        // Also refresh current user's own status
+        const selfStatus = await fetch(`/api/stream/status/${encodeURIComponent(currentUser)}/`, { credentials: 'same-origin' });
+        if (selfStatus.ok) {
+            const selfData = await selfStatus.json();
+            const wasOnline = currentOnlineCache.get(currentUser);
+            currentOnlineCache.set(currentUser, !!selfData.online);
+            updateSidebarTri(currentUser, {active: !!selfData.active, online: !!selfData.online});
+            if (wasOnline !== !!selfData.online) {
+                console.log(`[Status Refresh] Self status changed: ${wasOnline} -> ${selfData.online}`);
+            }
+        }
+        
+        // If viewing someone's page, update their live pill too
+        if (selectedUsername) {
+            const userStatus = await fetch(`/api/stream/status/${encodeURIComponent(selectedUsername)}/`, { credentials: 'same-origin' });
+            if (userStatus.ok) {
+                const userData = await userStatus.json();
+                currentOnlineCache.set(selectedUsername, !!userData.online);
+                updateLivePill({active: !!userData.active, online: !!userData.online});
+                if (!isOwnerView) {
+                    updateListenerControlsVisibility(!!userData.active);
+                }
+            }
+        }
+        
+        console.log('[Status Refresh] Refresh complete');
+    } catch (e) {
+        console.error('[Status Refresh] Error during refresh:', e);
+    }
+}
+
+// Start periodic refresh every 10 seconds
+console.log('[Status Refresh] Starting periodic refresh (every 10s)');
+setInterval(refreshFriendStatuses, 10000);
+// Also run once immediately after 2 seconds to get initial state
+setTimeout(refreshFriendStatuses, 2000);
 </script>
 {% endblock %}

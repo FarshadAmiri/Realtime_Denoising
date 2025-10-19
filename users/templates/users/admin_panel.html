@@ -1,0 +1,630 @@
+{% extends "core/base.html" %}
+
+{% block title %}Admin Panel - User Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    
+    .admin-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    
+    .btn-create {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: filter 0.15s ease;
+    }
+    
+    .btn-create:hover {
+        filter: brightness(1.1);
+    }
+    
+    .users-table-container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .users-table thead {
+        background: linear-gradient(135deg, #1e3a8a, #1e40af);
+        color: white;
+    }
+    
+    .users-table th {
+        padding: 1rem;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.95rem;
+        text-transform: capitalize;
+        letter-spacing: 0.5px;
+    }
+    
+    .users-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        color: #374151;
+        text-align: center;
+    }
+    
+    .users-table tbody tr:hover {
+        background: #f9fafb;
+    }
+    
+    .username-link {
+        color: #2563eb;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: color 0.15s ease;
+    }
+    
+    .username-link:hover {
+        color: #1d4ed8;
+        text-decoration: underline;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .badge-admin {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .badge-regular {
+        background: #e5e7eb;
+        color: #374151;
+    }
+    
+    .badge-yes {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .badge-no {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .badge-superuser {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    /* Modal Styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-overlay.active {
+        display: flex;
+    }
+    
+    .modal-box {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .modal-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.8rem;
+        color: #6b7280;
+        cursor: pointer;
+        padding: 0;
+        transition: color 0.15s ease;
+    }
+    
+    .modal-close:hover {
+        color: #111827;
+    }
+    
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+    
+    .form-label {
+        display: block;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .form-input, .form-select {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.15s ease;
+    }
+    
+    .form-input:focus, .form-select:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .form-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: #374151;
+        cursor: pointer;
+    }
+    
+    .modal-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        margin-top: 2rem;
+    }
+    
+    .btn-modal {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: filter 0.15s ease;
+    }
+    
+    .btn-cancel {
+        background: #e5e7eb;
+        color: #374151;
+    }
+    
+    .btn-save {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+    }
+    
+    .btn-modal:hover {
+        filter: brightness(0.95);
+    }
+    
+    .note {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
+    
+    .error-message {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .success-message {
+        background: #d1fae5;
+        color: #065f46;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 2rem;
+        color: #6b7280;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h1 class="admin-title">User Management</h1>
+        <button class="btn-create" onclick="openCreateModal()">+ Create User</button>
+    </div>
+    
+    <div class="users-table-container">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Level</th>
+                    <th>Stream Access</th>
+                    <th>Date Joined</th>
+                </tr>
+            </thead>
+            <tbody id="users-table-body">
+                <tr>
+                    <td colspan="6" class="loading">Loading users...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div id="create-modal" class="modal-overlay" onclick="if(event.target === this) closeCreateModal()">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2 class="modal-title">Create New User</h2>
+            <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+        </div>
+        
+        <div id="create-error" class="error-message" style="display:none;"></div>
+        
+        <form id="create-form" onsubmit="handleCreateUser(event)">
+            <div class="form-group">
+                <label class="form-label">Username *</label>
+                <input type="text" class="form-input" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Password *</label>
+                <input type="password" class="form-input" name="password" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-input" name="name">
+                <div class="note">Optional</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-input" name="email">
+                <div class="note">Optional</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">User Level</label>
+                <select class="form-select" name="user_level">
+                    <option value="regular">Regular</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" class="form-checkbox" name="allow_stream" checked>
+                    Allow Streaming
+                </label>
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn-modal btn-cancel" onclick="closeCreateModal()">Cancel</button>
+                <button type="submit" class="btn-modal btn-save">Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="edit-modal" class="modal-overlay" onclick="if(event.target === this) closeEditModal()">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2 class="modal-title">Edit User</h2>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        
+        <div id="edit-error" class="error-message" style="display:none;"></div>
+        
+        <form id="edit-form" onsubmit="handleEditUser(event)">
+            <input type="hidden" name="user_id" id="edit-user-id">
+            
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" class="form-input" id="edit-username" readonly style="background:#f3f4f6;">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-input" name="password" id="edit-password">
+                <div class="note">Leave blank to keep current password</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-input" name="name" id="edit-name">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-input" name="email" id="edit-email">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">User Level</label>
+                <select class="form-select" name="user_level" id="edit-user-level">
+                    <option value="regular">Regular</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <div class="note" id="edit-superuser-note" style="display:none;">This is a superuser - admin privileges are permanent</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" class="form-checkbox" name="allow_stream" id="edit-allow-stream">
+                    Allow Streaming
+                </label>
+                <div class="note" id="edit-stream-note" style="display:none;">Admins can always stream</div>
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn-modal btn-cancel" onclick="closeEditModal()">Cancel</button>
+                <button type="submit" class="btn-modal btn-save">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allUsers = [];
+
+function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m.pop()) : null;
+}
+
+async function loadUsers() {
+    try {
+        const response = await fetch('/api/admin/users/', {
+            credentials: 'same-origin'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load users');
+        }
+        
+        const data = await response.json();
+        allUsers = data.users;
+        renderUsersTable();
+    } catch (error) {
+        document.getElementById('users-table-body').innerHTML = 
+            `<tr><td colspan="6" style="text-align:center;color:#ef4444;">Error loading users: ${error.message}</td></tr>`;
+    }
+}
+
+function renderUsersTable() {
+    const tbody = document.getElementById('users-table-body');
+    
+    if (allUsers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;">No users found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = allUsers.map(user => {
+        const levelBadge = user.is_superuser 
+            ? '<span class="badge badge-superuser">Superuser</span>' 
+            : user.user_level === 'admin' 
+                ? '<span class="badge badge-admin">Admin</span>' 
+                : '<span class="badge badge-regular">Regular</span>';
+        
+        const streamBadge = user.allow_stream || user.user_level === 'admin' || user.is_superuser
+            ? '<span class="badge badge-yes">Yes</span>'
+            : '<span class="badge badge-no">No</span>';
+        
+        const dateJoined = user.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A';
+        
+        return `
+            <tr>
+                <td><a class="username-link" onclick="openEditModal(${user.id})">${user.username}</a></td>
+                <td>${user.name || '-'}</td>
+                <td>${user.email || '-'}</td>
+                <td>${levelBadge}</td>
+                <td>${streamBadge}</td>
+                <td>${dateJoined}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openCreateModal() {
+    document.getElementById('create-modal').classList.add('active');
+    document.getElementById('create-form').reset();
+    document.getElementById('create-error').style.display = 'none';
+}
+
+function closeCreateModal() {
+    document.getElementById('create-modal').classList.remove('active');
+}
+
+async function handleCreateUser(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const data = {
+        username: formData.get('username'),
+        password: formData.get('password'),
+        name: formData.get('name'),
+        email: formData.get('email'),
+        user_level: formData.get('user_level'),
+        allow_stream: formData.get('allow_stream') === 'on'
+    };
+    
+    try {
+        const response = await fetch('/api/admin/users/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to create user');
+        }
+        
+        closeCreateModal();
+        loadUsers();
+        alert('User created successfully!');
+    } catch (error) {
+        document.getElementById('create-error').textContent = error.message;
+        document.getElementById('create-error').style.display = 'block';
+    }
+}
+
+function openEditModal(userId) {
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    document.getElementById('edit-user-id').value = user.id;
+    document.getElementById('edit-username').value = user.username;
+    document.getElementById('edit-password').value = '';
+    document.getElementById('edit-name').value = user.name || '';
+    document.getElementById('edit-email').value = user.email || '';
+    document.getElementById('edit-user-level').value = user.user_level;
+    document.getElementById('edit-allow-stream').checked = user.allow_stream;
+    document.getElementById('edit-error').style.display = 'none';
+    
+    // Show notes for superusers and admins
+    if (user.is_superuser) {
+        document.getElementById('edit-superuser-note').style.display = 'block';
+        document.getElementById('edit-user-level').disabled = true;
+    } else {
+        document.getElementById('edit-superuser-note').style.display = 'none';
+        document.getElementById('edit-user-level').disabled = false;
+    }
+    
+    if (user.user_level === 'admin' || user.is_superuser) {
+        document.getElementById('edit-stream-note').style.display = 'block';
+        document.getElementById('edit-allow-stream').disabled = true;
+        document.getElementById('edit-allow-stream').checked = true;
+    } else {
+        document.getElementById('edit-stream-note').style.display = 'none';
+        document.getElementById('edit-allow-stream').disabled = false;
+    }
+    
+    document.getElementById('edit-modal').classList.add('active');
+}
+
+function closeEditModal() {
+    document.getElementById('edit-modal').classList.remove('active');
+}
+
+async function handleEditUser(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const userId = formData.get('user_id');
+    
+    const data = {
+        name: formData.get('name'),
+        email: formData.get('email'),
+        user_level: formData.get('user_level'),
+        allow_stream: formData.get('allow_stream') === 'on'
+    };
+    
+    // Only include password if provided
+    const password = formData.get('password');
+    if (password) {
+        data.password = password;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/users/${userId}/update/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to update user');
+        }
+        
+        closeEditModal();
+        loadUsers();
+        alert('User updated successfully!');
+    } catch (error) {
+        document.getElementById('edit-error').textContent = error.message;
+        document.getElementById('edit-error').style.display = 'block';
+    }
+}
+
+// Load users on page load
+loadUsers();
+</script>
+{% endblock %}

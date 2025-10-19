@@ -26,15 +26,23 @@ def page_broadcaster(request):
         set_online(user.username)
     except Exception:
         pass
-    # Friends are accepted relationships in either direction
-    outgoing_ids = list(
-        Friendship.objects.filter(from_user=user, status='accepted').values_list('to_user_id', flat=True)
-    )
-    incoming_ids = list(
-        Friendship.objects.filter(to_user=user, status='accepted').values_list('from_user_id', flat=True)
-    )
-    friend_ids = list(set(outgoing_ids + incoming_ids))
-    friend_users = User.objects.filter(id__in=friend_ids)
+    
+    # Check if user is admin
+    is_admin = user.is_superuser or (hasattr(user, 'profile') and user.profile.user_level == 'admin')
+    
+    if is_admin:
+        # Admins see all users except themselves
+        friend_users = User.objects.exclude(id=user.id).order_by('username')
+    else:
+        # Friends are accepted relationships in either direction
+        outgoing_ids = list(
+            Friendship.objects.filter(from_user=user, status='accepted').values_list('to_user_id', flat=True)
+        )
+        incoming_ids = list(
+            Friendship.objects.filter(to_user=user, status='accepted').values_list('from_user_id', flat=True)
+        )
+        friend_ids = list(set(outgoing_ids + incoming_ids))
+        friend_users = User.objects.filter(id__in=friend_ids)
 
     friends = []
     for fu in friend_users:
@@ -48,11 +56,17 @@ def page_broadcaster(request):
     from .webrtc_handler import get_session_by_username
     self_is_streaming = bool(get_session_by_username(user.username))
     self_is_online = is_online(user.username)
+    
+    # Check if user can stream
+    can_stream = True
+    if hasattr(user, 'profile'):
+        can_stream = user.profile.can_stream()
 
     return render(request, 'streams/main.html', {
         'friends': friends,
         'self_is_streaming': self_is_streaming,
         'self_is_online': self_is_online,
+        'can_stream': can_stream,
         'browser_audio_processing': getattr(settings, 'BROWSER_AUDIO_PROCESSING', True),
     })
 
@@ -66,8 +80,10 @@ def page_listener(request, username):
         return render(request, 'streams/no_access.html', { 'username': username })
 
     is_owner = request.user.id == target_user.id
-    # Enforce friendship for non-owners
-    if not is_owner and not Friendship.are_friends(request.user, target_user):
+    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.user_level == 'admin')
+    
+    # Enforce friendship for non-owners (unless admin)
+    if not is_owner and not is_admin and not Friendship.are_friends(request.user, target_user):
         return render(request, 'streams/no_access.html', { 'username': username })
 
     is_streaming = ActiveStream.objects.filter(user=target_user).exists()
@@ -102,6 +118,12 @@ def user_page(request, username):
 @permission_classes([IsAuthenticated])
 def start_stream(request):
     user = request.user
+    
+    # Check if user is allowed to stream
+    if hasattr(user, 'profile'):
+        if not user.profile.can_stream():
+            return Response({'error': 'You do not have permission to stream'}, status=403)
+    
     denoise = bool(request.data.get('denoise', True))
     # Close any lingering session first
     existing = get_session_by_username(user.username)
@@ -158,12 +180,20 @@ def stop_stream(request):
     ActiveStream.objects.filter(user=user).delete()
     try:
         channel_layer = get_channel_layer()
+        # Broadcast both streaming stopped and stream ended notification
         async_to_sync(channel_layer.group_send)(
             'presence',
             {
                 'type': 'streaming_status_update',
                 'username': user.username,
                 'is_streaming': False,
+            },
+        )
+        async_to_sync(channel_layer.group_send)(
+            'presence',
+            {
+                'type': 'stream_ended',
+                'username': user.username,
             },
         )
     except Exception:
@@ -279,6 +309,21 @@ def stream_status(request, username):
 @permission_classes([IsAuthenticated])
 def heartbeat(request):
     """Mark current user as online (called periodically by client)."""
-    set_online(request.user.username)
+    username = request.user.username
+    was_online = is_online(username)
+    set_online(username)
+    # Broadcast online status if state changed (first heartbeat or returning after timeout)
+    if not was_online:
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'presence',
+                {
+                    'type': 'online_status_update',
+                    'username': username,
+                    'is_online': True,
+                },
+            )
+        except Exception:
+            pass
     return Response({'ok': True})
-    # End
