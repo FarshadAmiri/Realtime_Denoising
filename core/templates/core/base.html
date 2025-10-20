@@ -17,18 +17,82 @@
             color: #333;
         }
         
-        .navbar { background: linear-gradient(90deg,#181f42,#2e3d53); color: white; font-size: 18px; font-weight: 500; padding: .9rem 2rem; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 10px 20px rgba(0,0,0,.12); position:sticky; top:0; z-index:50 }
+        .navbar { 
+            background: linear-gradient(90deg, #343434 0%,  #5f5f5f 100%);
+            color: white; 
+            font-size: 16px; 
+            font-weight: 500; 
+            padding: 0.65rem 2rem; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            position: sticky; 
+            top: 0; 
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
         
-        .navbar h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .3px; display:flex; align-items:center; gap:.5rem }
+        .navbar-brand {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            font-size: 1.40rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            text-decoration: none;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            transition: all 0.5s ease;
+        }
+        
+        .navbar-brand:hover {
+            transform: translateX(-50%) scale(1.25);
+            text-shadow: 0 2px 12px rgba(210, 123, 57, 0.517);
+        }
+        
+        .mic-icon {
+            font-size: 1.4rem;
+            filter: drop-shadow(0 2px 6px rgba(255, 255, 255, 0.2));
+        }
         
         .navbar-links {
             display: flex;
             gap: 1.5rem;
             align-items: center;
+            z-index: 1;
         }
         
-        .navbar-links a { color:white; text-decoration:none; padding:.45rem .9rem; border-radius:999px; transition: all .15s ease; border:1px solid transparent }
-        .navbar-links a:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,.15) }
+        .navbar-left {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            z-index: 1;
+        }
+        
+        .navbar-links a, .navbar-left a { 
+            color: white; 
+            text-decoration: none; 
+            padding: 0.4rem 1rem; 
+            border-radius: 20px; 
+            transition: all 0.3s ease; 
+            border: 1px solid transparent;
+            font-weight: 500;
+            font-size: 0.95rem;
+            background: rgba(255, 255, 255, 0);
+            backdrop-filter: blur(10px);
+        }
+        
+        .navbar-links a:hover, .navbar-left a:hover { 
+            background: rgba(0, 0, 0, 0.15); 
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.27);
+            transform: translateY(-1px);
+        }
         
         .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
         
@@ -97,18 +161,25 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1><a href="{% url 'main_page' %}" style="color:white; text-decoration:none">Voice Stream</a></h1>
+        <div class="navbar-left">
+            {% if user.is_authenticated %}
+            <span style="color: #ffd700; font-weight: 600; text-shadow: 0 2px 8px rgba(0,0,0,0.3);">@{{ user.username }}</span>
+            {% endif %}
+            <a href="{% url 'main_page' %}"> Home</a>
+        </div>
+        
+        <a href="{% url 'main_page' %}" class="navbar-brand">
+            <span class="mic-icon">🎙️</span>
+            <span>ClearCast</span>
+        </a>
+        
         <div class="navbar-links">
             {% if user.is_authenticated %}
                 {% if user.is_superuser or user.profile.user_level == 'admin' %}
                 <a href="{% url 'admin_panel' %}">Admin Panel</a>
                 {% endif %}
                 <a href="#" id="nav-friends">Friends</a>
-                <span style="color: #e1ca65">@{{ user.username }}</span>
                 <a href="{% url 'logout' %}">Logout</a>
-            {% else %}
-                <a href="{% url 'login' %}">Login</a>
-                <a href="{% url 'register' %}">Register</a>
             {% endif %}
         </div>
     </nav>

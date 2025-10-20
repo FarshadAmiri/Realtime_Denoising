@@ -30,28 +30,6 @@ def login_view(request):
     return render(request, 'users/login.html')
 
 
-def register_view(request):
-    """User registration view."""
-    if request.user.is_authenticated:
-        return redirect('main_page')
-    
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        password2 = request.POST.get('password2')
-        
-        if password != password2:
-            messages.error(request, 'Passwords do not match')
-        elif User.objects.filter(username=username).exists():
-            messages.error(request, 'Username already exists')
-        else:
-            user = User.objects.create_user(username=username, password=password)
-            login(request, user)
-            return redirect('main_page')
-    
-    return render(request, 'users/register.html')
-
-
 def logout_view(request):
     """User logout view."""
     logout(request)
@@ -257,6 +235,15 @@ def api_friends_list(request):
     if is_admin:
         # Admins see all users except themselves
         users = User.objects.exclude(id=user.id).order_by('username')
+        
+        # Get friend IDs for marking friends in the list
+        outgoing_ids = list(
+            Friendship.objects.filter(from_user=user, status='accepted').values_list('to_user_id', flat=True)
+        )
+        incoming_ids = list(
+            Friendship.objects.filter(to_user=user, status='accepted').values_list('from_user_id', flat=True)
+        )
+        friend_ids = set(outgoing_ids + incoming_ids)
     else:
         # Regular users see only their friends
         outgoing_ids = list(
@@ -265,17 +252,22 @@ def api_friends_list(request):
         incoming_ids = list(
             Friendship.objects.filter(to_user=user, status='accepted').values_list('from_user_id', flat=True)
         )
-        friend_ids = list(set(outgoing_ids + incoming_ids))
+        friend_ids = set(outgoing_ids + incoming_ids)
         users = User.objects.filter(id__in=friend_ids)
     
     data = []
     for u in users:
         is_streaming = bool(get_session_by_username(u.username))
-        data.append({
+        user_data = {
             'username': u.username,
             'is_streaming': is_streaming,
             'is_online': is_online(u.username),
-        })
+        }
+        # For admins, indicate if this user is also a friend
+        if is_admin:
+            user_data['is_friend'] = u.id in friend_ids
+        
+        data.append(user_data)
     return Response({'friends': data})
 
 

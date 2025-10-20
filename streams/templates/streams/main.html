@@ -64,7 +64,7 @@
             cursor: pointer;
             transition: transform .1s ease, box-shadow .15s ease, filter .2s ease;
             /* box-shadow: 0 12px 24px rgba(16, 185, 129, .25); */
-            background: linear-gradient(135deg, #1970dc, #2c0084);
+            background: linear-gradient(135deg, #2262b1, #1e2971);
         }
         .cta:hover { filter: brightness(1.05);}
         .cta:active { transform: translateY(1px); }
@@ -111,7 +111,7 @@
         .search input { width:100%; padding:.65rem .9rem; border-radius:10px; border:1px solid #e5e7eb; outline:none }
         .search input:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.1) }
         .user-chip { padding:.35rem .6rem; background:#f3f4f6; border-radius:999px; font-size:.75rem }
-        .list { max-height:260px; overflow:auto; margin-top:.75rem }
+        .list { max-height:450px; overflow:auto; margin-top:.75rem }
         .req { display:flex; justify-content:space-between; align-items:center; padding:.5rem; border-radius:8px; border:1px solid #eef2f7; margin-bottom:.5rem }
 
         .empty { text-align:center; color:#6b7280; padding:1rem }
@@ -210,7 +210,7 @@
                     <button id="denoise-btn" type="button" class="toggle-pill toggle-on" onclick="toggleDenoise()" title="Toggle denoise before starting stream">Denoise: ON</button>
                 </div>
                 <div style="display:flex; align-items:center; gap:.5rem">
-                    <span class="timer" id="timer" style="background:#64676e; font-size: 17px;color:#fff; padding:.35rem .6rem; border-radius:8px; min-width:64px; text-align:center">00:00</span>
+                    <span class="timer" id="timer" style="background:#737276; font-size: 17px;color:#fff; padding:.35rem .6rem; border-radius:8px; min-width:64px; text-align:center">00:00</span>
                 </div>
             </div>
             <div id="stream-status" class="muted" style="margin:.5rem 0 1rem"></div>
@@ -595,7 +595,9 @@ async function refreshFriendsList(){
         if(f.is_streaming){ statusHTML = `<span class="dot live-dot"></span> Streaming <span class=\"rec-icon\">⏺</span>`; }
         else if(f.is_online){ statusHTML = `<span class="dot online-dot"></span> Online`; }
         else { statusHTML = `<span class="dot offline-dot"></span> Offline`; }
-        d.innerHTML=`<div class=\"friend-info\" onclick=\"selectEntry('${f.username}', false)\"><div class=\"friend-name\">${f.username}</div><div class=\"friend-meta\">${statusHTML}</div></div><div style=\"position: relative;\"><button class=\"friend-options-btn\" onclick=\"event.stopPropagation(); toggleFriendMenu('${f.username}')\">⋮</button><div class=\"friend-options-menu\" id=\"friend-menu-${f.username}\"><div class=\"friend-options-menu-item danger\" onclick=\"event.stopPropagation(); showUnfriendModal('${f.username}')\">Unfriend</div></div></div>`; 
+        // Add (friend) label for admins viewing all users
+        const friendLabel = (f.is_friend !== undefined && f.is_friend) ? ' <span style="color:#777;font-size:0.9rem;">(friend)</span>' : '';
+        d.innerHTML=`<div class=\"friend-info\" onclick=\"selectEntry('${f.username}', false)\"><div class=\"friend-name\">${f.username}${friendLabel}</div><div class=\"friend-meta\">${statusHTML}</div></div><div style=\"position: relative;\"><button class=\"friend-options-btn\" onclick=\"event.stopPropagation(); toggleFriendMenu('${f.username}')\">⋮</button><div class=\"friend-options-menu\" id=\"friend-menu-${f.username}\"><div class=\"friend-options-menu-item danger\" onclick=\"event.stopPropagation(); showUnfriendModal('${f.username}')\">Unfriend</div></div></div>`; 
         box.appendChild(d);
     });
 }
