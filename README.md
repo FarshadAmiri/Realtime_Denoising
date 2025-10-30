@@ -1,5 +1,5 @@
 # ClearCast
-# Real-time Audio Streaming with Denoising
+## Real-time Audio Streaming with Denoising
 
 Stream audio to your friends with AI-powered noise removal using DeepFilterNet2.
 
