@@ -4,6 +4,7 @@ Stream audio to your friends with AI-powered noise removal using DeepFilterNet2.
 
 ## What it does
 
+- Uses DeepFilterNet2 for the actual denoising.
 - Stream your mic audio to friends in real-time (with optional denoising)
 - Upload audio files for denoising
 - Friend system with requests
@@ -43,19 +44,6 @@ redis-server
 python manage.py runserver
 ```
 
-Go to http://localhost:8000 and you're good to go.
-
-## How to use
-
-1. Register and login
-2. Add friends (search by username)
-3. Start streaming from your page - toggle denoising on/off as needed
-4. Click on friends to listen to their live streams
-5. Upload audio files for denoising (navbar button)
-6. All streams are saved automatically
-
-Admins can manage users and permissions from the admin panel.
-
 ## Configuration
 
 You can tweak these in your environment:
@@ -76,7 +64,3 @@ You can tweak these in your environment:
 **WebSocket issues?**
 - Check browser console for errors
 - Make sure you're using Daphne or another ASGI server in production
-
-## Notes
-
-Uses DeepFilterNet2 for the actual denoising. Check their license if you're planning to use this commercially.
