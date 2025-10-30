@@ -1,199 +1,82 @@
-# Real-time Audio Denoising Web Application
+# ClearCast - Real-time Audio Streaming with Denoising
 
-A Django + Channels + WebRTC application for real-time audio streaming with DeepFilterNet2 denoising.
+Stream audio to your friends with AI-powered noise removal using DeepFilterNet2.
 
-## Features
+## What it does
 
-- **Real-time Audio Streaming**: Stream audio from your microphone to friends with optional denoising
-- **Friend System**: Search for users, send friend requests, and build your network
-- **Live Presence**: See which friends are currently streaming in real-time
-- **Recording Storage**: All streams are automatically saved as denoised audio files
-- **WebSocket Integration**: Instant presence updates via Redis-backed Channels
-- **WebRTC Support**: Low-latency peer-to-peer audio streaming
+- Stream your mic audio to friends in real-time (with optional denoising)
+- Upload audio files for denoising
+- Friend system with requests
+- See who's live streaming
+- All streams get saved automatically
+- Admin panel for managing users and permissions
 
-## Architecture
+## Tech Stack
 
-### Core Components
+Django + Django Channels + WebRTC + Redis + DeepFilterNet2
 
-1. **Django Apps**:
-   - `users`: User authentication and friend management
-   - `streams`: Audio streaming, recordings, and WebRTC signaling
-   - `core`: Base templates and shared utilities
-
-2. **Audio Processing**:
-   - `dfn2.py`: DeepFilterNet2 integration for real-time denoising
-   - Configurable chunk size (default 2s) and overlap (default 0.5s)
-   - Server-side processing with crossfade between chunks
-
-3. **Communication**:
-   - REST API for stream control and data retrieval
-   - WebSocket for presence updates and WebRTC signaling
-   - Redis backend for Channels layer
-
-### Models
-
-- **User** (Django built-in): User accounts
-- **Friendship**: Mutual friendship relationships with pending/accepted/rejected status
-- **ActiveStream**: Tracks currently active audio streams
-- **StreamRecording**: Stores completed denoised audio recordings
+The audio processing runs server-side with configurable chunk sizes and overlap for smooth crossfading.
 
 ## Setup
 
-### Prerequisites
-
+**Requirements:**
 - Python 3.8+
-- Redis server (for Channels)
-- CUDA-capable GPU (optional, for faster denoising)
+- Redis
+- GPU recommended but not required
 
-### Installation
+**Quick start:**
 
-1. Clone the repository:
 ```bash
+# Clone and install
 git clone https://github.com/FarshadAmiri/Realtime_Denoising.git
 cd Realtime_Denoising
-```
-
-2. Install dependencies:
-```bash
 pip install -r requirements.txt
-```
 
-3. Configure environment:
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-4. Run migrations:
-```bash
+# Setup database
 python manage.py migrate
-```
-
-5. Create a superuser:
-```bash
 python manage.py createsuperuser
-```
 
-6. Start Redis (in a separate terminal):
-```bash
+# Start Redis (separate terminal)
 redis-server
-```
 
-7. Run the development server:
-```bash
+# Run server
 python manage.py runserver
 ```
 
-Or use Daphne for ASGI support:
-```bash
-daphne -b 0.0.0.0 -p 8000 audio_stream_project.asgi:application
-```
+Go to http://localhost:8000 and you're good to go.
 
-8. Visit http://localhost:8000
+## How to use
 
-## Usage
+1. Register and login
+2. Add friends (search by username)
+3. Start streaming from your page - toggle denoising on/off as needed
+4. Click on friends to listen to their live streams
+5. Upload audio files for denoising (navbar button)
+6. All streams are saved automatically
 
-### User Flow
-
-1. **Register/Login**: Create an account or log in
-2. **Find Friends**: Search for users by username and send friend requests
-3. **Accept Requests**: View and accept friend requests from the "Requests" page
-4. **Main Page**: View your friends list with live streaming indicators
-5. **Start Streaming**: 
-   - Go to your user page
-   - Click "Start Streaming"
-   - Toggle denoise on/off
-   - Stream duration timer shows elapsed time
-6. **Listen to Friends**:
-   - Click on a friend in the sidebar (or visit their page)
-   - If they're live, click "Start Listening"
-   - Audio plays in real-time with denoising applied
-7. **View Recordings**: All completed streams are saved and listed on user pages
+Admins can manage users and permissions from the admin panel.
 
 ## Configuration
 
-### Environment Variables
+You can tweak these in your environment:
 
-- `DEBUG`: Django debug mode (default: True)
-- `SECRET_KEY`: Django secret key
-- `REDIS_HOST`: Redis server host (default: 127.0.0.1)
-- `REDIS_PORT`: Redis server port (default: 6379)
-- `AUDIO_CHUNK_SECONDS`: Audio chunk size in seconds (default: 2.0)
-- `AUDIO_OVERLAP_SECONDS`: Crossfade overlap in seconds (default: 0.5)
-- `AUDIO_SAMPLE_RATE`: Audio sample rate (default: 48000)
-
-### Audio Processing Settings
-
-The denoising pipeline uses the `dfn2.denoise()` function in streaming mode:
-
-```python
-result = denoise(
-    input_mode="streaming",
-    output_path=output_wav,
-    chunk_seconds=2.0,        # Configurable via AUDIO_CHUNK_SECONDS
-    overlap_seconds=0.5,      # Configurable via AUDIO_OVERLAP_SECONDS
-    playback=False,           # Server-side, no local playback
-    return_tensor=False,
-)
-```
-
-## Security Considerations
-
-- **CSRF Protection**: All POST requests require CSRF tokens
-- **Authentication**: All API endpoints require authentication
-- **Friend Verification**: Users can only view/listen to friends' streams
-- **Session Management**: Proper session handling for streaming state
-- **CORS**: Configured for WebRTC (restrict in production)
-
-## Development Notes
-
-### Testing
-
-Currently, the WebRTC streaming is scaffolded with UI controls. For full implementation:
-
-1. Implement WebRTC peer connections in JavaScript
-2. Add server-side audio ingestion from WebRTC tracks
-3. Integrate `dfn2.denoise()` in a background worker
-4. Stream processed audio back to listeners via WebRTC
-
-### Production Deployment
-
-1. Set `DEBUG=False` in settings
-2. Use proper secret key
-3. Configure ALLOWED_HOSTS
-4. Use PostgreSQL instead of SQLite
-5. Serve static files with nginx/whitenoise
-6. Use Redis Sentinel for high availability
-7. Deploy with Gunicorn + Daphne workers
-8. Set up SSL/TLS certificates
+- `AUDIO_CHUNK_SECONDS`: Chunk size for processing (default: 2.0)
+- `AUDIO_OVERLAP_SECONDS`: Overlap for smooth crossfade (default: 0.5)
+- `REDIS_HOST` / `REDIS_PORT`: Redis connection
 
 ## Troubleshooting
 
-### Redis Connection Issues
-- Ensure Redis is running: `redis-cli ping` should return `PONG`
-- Check Redis connection in settings: `REDIS_HOST` and `REDIS_PORT`
+**Redis not connecting?**
+- Make sure it's running: `redis-cli ping` should return `PONG`
 
-### WebSocket Connection Issues
-- Use Daphne or another ASGI server (not Django runserver in production)
-- Check browser console for WebSocket errors
-- Verify firewall settings allow WebSocket connections
+**Denoising not working?**
+- Check if DeepFilterNet2 models are in `./DeepFilterNet2/`
+- For GPU: `python -c "import torch; print(torch.cuda.is_available())"`
 
-### Audio Denoising Issues
-- Ensure DeepFilterNet2 model files are in `./DeepFilterNet2/`
-- Check CUDA availability: `python -c "import torch; print(torch.cuda.is_available())"`
-- Verify audio chunk settings are appropriate for your use case
+**WebSocket issues?**
+- Check browser console for errors
+- Make sure you're using Daphne or another ASGI server in production
 
-## License
+## Notes
 
-This project integrates DeepFilterNet2 for audio denoising. Please refer to the DeepFilterNet2 license for usage terms.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## Support
-
-For issues and questions, please open an issue on GitHub.
+Uses DeepFilterNet2 for the actual denoising. Check their license if you're planning to use this commercially.
