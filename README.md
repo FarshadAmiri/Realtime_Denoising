@@ -110,31 +110,6 @@ daphne -b 0.0.0.0 -p 8000 audio_stream_project.asgi:application
    - Audio plays in real-time with denoising applied
 7. **View Recordings**: All completed streams are saved and listed on user pages
 
-### API Endpoints
-
-#### Authentication
-- `POST /login/` - User login
-- `POST /register/` - User registration
-- `GET /logout/` - User logout
-
-#### Friend Management
-- `GET /search/?q=username` - Search for users
-- `POST /api/friends/request/` - Send friend request
-- `POST /api/friends/accept/` - Accept friend request
-- `POST /api/friends/reject/` - Reject friend request
-- `GET /friend-requests/` - View pending requests
-
-#### Streaming
-- `POST /api/stream/start/` - Start streaming (body: `{denoise: bool}`)
-- `POST /api/stream/stop/` - Stop streaming
-- `GET /api/stream/status/<username>/` - Get user's streaming status
-- `GET /api/recordings/` - List own recordings
-- `GET /api/recordings/<username>/` - List user's recordings (if friend)
-
-#### WebSocket Endpoints
-- `ws://localhost:8000/ws/presence/` - Presence updates
-- `ws://localhost:8000/ws/stream/<username>/` - WebRTC signaling for specific stream
-
 ## Configuration
 
 ### Environment Variables
@@ -160,37 +135,6 @@ result = denoise(
     playback=False,           # Server-side, no local playback
     return_tensor=False,
 )
-```
-
-## Project Structure
-
-```
-Realtime_Denoising/
-├── audio_stream_project/    # Django project settings
-│   ├── settings.py
-│   ├── urls.py
-│   ├── asgi.py
-│   └── wsgi.py
-├── users/                   # User and friendship management
-│   ├── models.py
-│   ├── views.py
-│   ├── admin.py
-│   └── templates/
-├── streams/                 # Audio streaming and recordings
-│   ├── models.py
-│   ├── views.py
-│   ├── consumers.py         # WebSocket consumers
-│   ├── routing.py
-│   ├── admin.py
-│   └── templates/
-├── core/                    # Base templates
-│   └── templates/
-├── static/                  # Static files (CSS, JS)
-├── media/                   # User-uploaded files (recordings)
-├── dfn2.py                  # DeepFilterNet2 integration
-├── DeepFilterNet2/          # Model files
-├── manage.py
-└── requirements.txt
 ```
 
 ## Security Considerations
