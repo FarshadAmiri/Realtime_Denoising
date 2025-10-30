@@ -26,6 +26,36 @@ from av.audio.resampler import AudioResampler
 import re
 
 
+def cleanup_old_temp_recordings(max_age_hours: int = 24):
+    """Remove temporary recording files older than max_age_hours.
+    
+    Args:
+        max_age_hours: Maximum age in hours before a temp file is deleted (default: 24)
+    """
+    try:
+        streamed_audios_dir = Path(settings.BASE_DIR) / "streamed_audios"
+        if not streamed_audios_dir.exists():
+            return
+        
+        now = time.time()
+        max_age_seconds = max_age_hours * 3600
+        deleted_count = 0
+        
+        for file in streamed_audios_dir.glob("*.wav"):
+            try:
+                if now - file.stat().st_mtime > max_age_seconds:
+                    file.unlink()
+                    deleted_count += 1
+                    print(f"Cleaned up old temp recording: {file.name}")
+            except Exception as e:
+                print(f"Error deleting temp file {file.name}: {e}")
+        
+        if deleted_count > 0:
+            print(f"Cleaned up {deleted_count} old temporary recording(s)")
+    except Exception as e:
+        print(f"Error during temp recordings cleanup: {e}")
+
+
 class ListenerAudioTrack(MediaStreamTrack):
     kind = "audio"
 
@@ -131,6 +161,9 @@ class WebRTCSession:
         streamed_audios_dir = Path(settings.BASE_DIR) / "streamed_audios"
         streamed_audios_dir.mkdir(parents=True, exist_ok=True)
         self.recording_path = streamed_audios_dir / f"{self.username}_{self.session_id}.wav"
+        
+        # Cleanup old temporary recordings (24 hours or older)
+        cleanup_old_temp_recordings(max_age_hours=24)
 
 
         @self.pc.on("track")

@@ -28,9 +28,32 @@ class StreamRecording(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
+
+class UploadedAudioFile(models.Model):
+    """Stores user-uploaded audio files for denoising."""
+    PROCESSING_STATUS = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploaded_files')
+    original_filename = models.CharField(max_length=255)
+    original_file = models.FileField(upload_to='uploads/original/')
+    denoised_file = models.FileField(upload_to='uploads/denoised/', null=True, blank=True)
+    status = models.CharField(max_length=20, choices=PROCESSING_STATUS, default='pending')
+    error_message = models.TextField(null=True, blank=True)
+    duration = models.FloatField(default=0.0)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-uploaded_at']
     
     def __str__(self):
-        return f"{self.owner.username} - {self.title} ({self.duration}s)"
+        return f"{self.owner.username} - {self.original_filename} ({self.status})"
     
     def get_duration_display(self):
         """Return duration in mm:ss format."""

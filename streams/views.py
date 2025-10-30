@@ -327,3 +327,207 @@ def heartbeat(request):
         except Exception:
             pass
     return Response({'ok': True})
+
+
+# File denoising endpoints
+from .models import UploadedAudioFile
+from django.core.files.base import ContentFile
+from django.utils import timezone
+import threading
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_audio_file(request):
+    """Upload an audio file for denoising."""
+    if 'file' not in request.FILES:
+        return Response({'error': 'No file provided'}, status=400)
+    
+    uploaded_file = request.FILES['file']
+    
+    # Validate file type
+    allowed_extensions = ['.wav', '.mp3', '.flac', '.ogg', '.m4a']
+    filename = uploaded_file.name.lower()
+    if not any(filename.endswith(ext) for ext in allowed_extensions):
+        return Response({'error': 'Invalid file type. Allowed: WAV, MP3, FLAC, OGG, M4A'}, status=400)
+    
+    # Create database entry
+    audio_file = UploadedAudioFile.objects.create(
+        owner=request.user,
+        original_filename=uploaded_file.name,
+        original_file=uploaded_file,
+        status='pending'
+    )
+    
+    # Start denoising in background thread
+    thread = threading.Thread(target=process_audio_file, args=(audio_file.id,))
+    thread.daemon = True
+    thread.start()
+    
+    return Response({
+        'id': audio_file.id,
+        'filename': audio_file.original_filename,
+        'status': audio_file.status,
+        'uploaded_at': audio_file.uploaded_at.isoformat()
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_uploaded_files(request):
+    """Get list of uploaded files for the current user."""
+    files = UploadedAudioFile.objects.filter(owner=request.user)
+    
+    data = []
+    for f in files:
+        data.append({
+            'id': f.id,
+            'original_filename': f.original_filename,
+            'original_file_url': f.original_file.url if f.original_file else None,
+            'denoised_file_url': f.denoised_file.url if f.denoised_file else None,
+            'status': f.status,
+            'error_message': f.error_message,
+            'duration': f.duration,
+            'uploaded_at': f.uploaded_at.isoformat(),
+            'processed_at': f.processed_at.isoformat() if f.processed_at else None,
+        })
+    
+    return Response({'files': data})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_file_status(request, file_id):
+    """Get the processing status of a specific file."""
+    try:
+        audio_file = UploadedAudioFile.objects.get(id=file_id, owner=request.user)
+    except UploadedAudioFile.DoesNotExist:
+        return Response({'error': 'File not found'}, status=404)
+    
+    return Response({
+        'id': audio_file.id,
+        'status': audio_file.status,
+        'denoised_file_url': audio_file.denoised_file.url if audio_file.denoised_file else None,
+        'error_message': audio_file.error_message,
+        'processed_at': audio_file.processed_at.isoformat() if audio_file.processed_at else None,
+    })
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_uploaded_file(request, file_id):
+    """Delete an uploaded file and its associated files from storage."""
+    import os
+    
+    try:
+        audio_file = UploadedAudioFile.objects.get(id=file_id, owner=request.user)
+    except UploadedAudioFile.DoesNotExist:
+        return Response({'error': 'File not found'}, status=404)
+    
+    # Delete physical files from storage
+    try:
+        if audio_file.original_file:
+            if audio_file.original_file.storage.exists(audio_file.original_file.name):
+                audio_file.original_file.delete(save=False)
+    except Exception as e:
+        print(f"Error deleting original file: {e}")
+    
+    try:
+        if audio_file.denoised_file:
+            if audio_file.denoised_file.storage.exists(audio_file.denoised_file.name):
+                audio_file.denoised_file.delete(save=False)
+    except Exception as e:
+        print(f"Error deleting denoised file: {e}")
+    
+    # Delete database record
+    audio_file.delete()
+    
+    return Response({'message': 'File deleted successfully'}, status=200)
+
+
+def process_audio_file(file_id):
+    """Background task to denoise an audio file."""
+    import os
+    import tempfile
+    from pathlib import Path
+    import soundfile as sf
+    import numpy as np
+    from django.core.files import File
+    
+    try:
+        audio_file = UploadedAudioFile.objects.get(id=file_id)
+        audio_file.status = 'processing'
+        audio_file.save()
+        
+        # Download original file to temp location
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_input:
+            temp_input_path = temp_input.name
+            for chunk in audio_file.original_file.chunks():
+                temp_input.write(chunk)
+        
+        # Convert to WAV if needed (using soundfile)
+        try:
+            data, sr = sf.read(temp_input_path)
+        except Exception:
+            # If soundfile can't read it, try using pydub for format conversion
+            try:
+                from pydub import AudioSegment
+                audio = AudioSegment.from_file(temp_input_path)
+                temp_wav = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                audio.export(temp_wav.name, format='wav')
+                temp_input_path = temp_wav.name
+                data, sr = sf.read(temp_input_path)
+            except Exception as e:
+                raise Exception(f"Failed to read audio file: {e}")
+        
+        # Ensure mono
+        if data.ndim > 1:
+            data = np.mean(data, axis=1)
+        
+        # Calculate duration
+        duration = len(data) / sr
+        audio_file.duration = duration
+        audio_file.save()
+        
+        # Save as temporary WAV for denoising
+        temp_wav_input = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+        sf.write(temp_wav_input.name, data, sr)
+        temp_wav_input.close()
+        
+        # Denoise using dfn2.py
+        temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='_denoised.wav')
+        temp_output.close()
+        
+        # Import and use dfn2 denoise function
+        import dfn2
+        dfn2.denoise_file(temp_wav_input.name, temp_output.name)
+        
+        # Save denoised file to model
+        denoised_filename = f"denoised_{audio_file.original_filename}"
+        if not denoised_filename.lower().endswith('.wav'):
+            denoised_filename = os.path.splitext(denoised_filename)[0] + '.wav'
+        
+        with open(temp_output.name, 'rb') as f:
+            audio_file.denoised_file.save(denoised_filename, File(f), save=False)
+        
+        audio_file.status = 'completed'
+        audio_file.processed_at = timezone.now()
+        audio_file.save()
+        
+        # Cleanup temp files
+        try:
+            os.unlink(temp_input_path)
+            os.unlink(temp_wav_input.name)
+            os.unlink(temp_output.name)
+        except Exception:
+            pass
+            
+    except Exception as e:
+        print(f"Error processing audio file {file_id}: {e}")
+        try:
+            audio_file = UploadedAudioFile.objects.get(id=file_id)
+            audio_file.status = 'failed'
+            audio_file.error_message = str(e)
+            audio_file.save()
+        except Exception:
+            pass

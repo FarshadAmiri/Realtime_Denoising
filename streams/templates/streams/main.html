@@ -1,6 +1,6 @@
 {% extends "core/base.html" %}
 
-{% block title %}Home - Audio Stream{% endblock %}
+{% block title %}Home | ClearCast{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -133,6 +133,134 @@
         .friends-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .friends-modal-close { background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer; padding: 0; transition: color 0.15s ease; }
         .friends-modal-close:hover { color: #111827; }
+        
+        /* Beautiful Buttons */
+        .btn-upload-denoise {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 0.65rem 1.75rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-upload-denoise:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+        .btn-upload-denoise:active {
+            transform: translateY(0px);
+        }
+        
+        .btn-delete-file {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn-delete-file:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        }
+        .btn-delete-file:active {
+            transform: translateY(0px);
+        }
+        
+        /* Beautiful File Input */
+        .file-input-wrapper {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            border: 2px dashed #d1d5db;
+            transition: all 0.3s ease;
+        }
+        .file-input-wrapper:hover {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #fefefe 0%, #f3f4f6 100%);
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+        }
+        .file-input-wrapper.has-file {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border-style: solid;
+        }
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .file-input-icon {
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+        .file-input-wrapper:hover .file-input-icon {
+            transform: scale(1.1);
+        }
+        .file-input-text {
+            flex: 1;
+        }
+        .file-input-main {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.95rem;
+        }
+        .file-input-wrapper.has-file .file-input-main {
+            color: #065f46;
+        }
+        .file-input-sub {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 0.15rem;
+        }
+        .file-input-wrapper.has-file .file-input-sub {
+            color: #047857;
+        }
+        .file-input-clear {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.35rem 0.65rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .file-input-clear:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+        #audio-file-input {
+            position: absolute;
+            width: 0.1px;
+            height: 0.1px;
+            opacity: 0;
+            overflow: hidden;
+            z-index: -1;
+        }
 </style>
 {% endblock %}
 
@@ -269,6 +397,63 @@
         <div class="modal-actions">
             <button class="modal-btn modal-btn-cancel" onclick="closeUnfriendModal()">Cancel</button>
             <button class="modal-btn modal-btn-danger" onclick="confirmUnfriend()">Unfriend</button>
+        </div>
+    </div>
+</div>
+
+<!-- Denoise File Modal -->
+<div id="denoise-modal" class="modal-overlay" onclick="if(event.target === this) closeDenoiseModal()">
+    <div class="friends-modal-box" style="max-width: 700px;">
+        <div class="friends-modal-header">
+            <h2 style="margin: 0;">Denoise Audio File</h2>
+            <button class="friends-modal-close" onclick="closeDenoiseModal()">&times;</button>
+        </div>
+        <div class="divider" style="margin: 0.5rem 0 1rem;"></div>
+        
+        <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Upload Your Audio File</h3>
+        <form id="upload-form" enctype="multipart/form-data" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; gap: 0.75rem; align-items: stretch;">
+                <div class="file-input-wrapper" id="file-input-wrapper">
+                    <label for="audio-file-input" class="file-input-label">
+                        <span class="file-input-icon">📁</span>
+                        <div class="file-input-text">
+                            <div class="file-input-main" id="file-input-main">Choose an audio file</div>
+                            <div class="file-input-sub" id="file-input-sub">WAV, MP3, FLAC, OGG, M4A</div>
+                        </div>
+                        <button type="button" class="file-input-clear" id="file-input-clear" style="display: none;" onclick="clearFileInput(event)">✕</button>
+                    </label>
+                    <input type="file" id="audio-file-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
+                </div>
+                <button type="submit" class="btn-upload-denoise">
+                    <span>✨</span>
+                    <span>Upload & Denoise</span>
+                </button>
+            </div>
+            <div id="upload-status" class="muted" style="margin-top: 0.5rem;"></div>
+        </form>
+        
+        <div class="divider"></div>
+        
+        <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Files</h3>
+        <div id="denoise-files-list" style="max-height: 400px; overflow-y: auto;">
+            <div class="empty">No files yet</div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete File Confirmation Modal -->
+<div id="delete-file-modal" class="modal-overlay" onclick="if(event.target === this) closeDeleteFileModal()">
+    <div class="modal-box">
+        <div class="modal-title">Delete Audio File</div>
+        <div class="modal-text">
+            Are you sure you want to delete <strong id="delete-file-name"></strong>?
+            <div style="margin-top: 0.75rem; padding: 0.75rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 0.9rem; color: #92400e;">
+                ⚠️ This will permanently delete both the original and denoised files.
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="modal-btn modal-btn-cancel" onclick="closeDeleteFileModal()">Cancel</button>
+            <button class="modal-btn modal-btn-danger" onclick="confirmDeleteFile()">Delete</button>
         </div>
     </div>
 </div>
@@ -781,5 +966,339 @@ console.log('[Status Refresh] Starting periodic refresh (every 10s)');
 setInterval(refreshFriendStatuses, 10000);
 // Also run once immediately after 2 seconds to get initial state
 setTimeout(refreshFriendStatuses, 2000);
+
+// ===== Denoise File Modal Functions =====
+function openDenoiseModal() {
+    document.getElementById('denoise-modal').classList.add('active');
+    refreshDenoiseFilesList();
+}
+
+function closeDenoiseModal() {
+    document.getElementById('denoise-modal').classList.remove('active');
+    clearFileInput();
+    document.getElementById('upload-status').textContent = '';
+}
+
+// File input handling
+function clearFileInput(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const fileInput = document.getElementById('audio-file-input');
+    fileInput.value = '';
+    updateFileInputUI();
+}
+
+function updateFileInputUI() {
+    const fileInput = document.getElementById('audio-file-input');
+    const wrapper = document.getElementById('file-input-wrapper');
+    const mainText = document.getElementById('file-input-main');
+    const subText = document.getElementById('file-input-sub');
+    const clearBtn = document.getElementById('file-input-clear');
+    const icon = wrapper.querySelector('.file-input-icon');
+    
+    if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const fileName = file.name;
+        const fileSize = (file.size / (1024 * 1024)).toFixed(2); // MB
+        
+        wrapper.classList.add('has-file');
+        mainText.textContent = fileName;
+        subText.textContent = `${fileSize} MB`;
+        clearBtn.style.display = 'block';
+        icon.textContent = '🎵';
+    } else {
+        wrapper.classList.remove('has-file');
+        mainText.textContent = 'Choose an audio file';
+        subText.textContent = 'WAV, MP3, FLAC, OGG, M4A';
+        clearBtn.style.display = 'none';
+        icon.textContent = '📁';
+    }
+}
+
+// Listen for file selection
+document.getElementById('audio-file-input').addEventListener('change', updateFileInputUI);
+
+async function refreshDenoiseFilesList() {
+    try {
+        const resp = await fetch('/api/denoise/files/', { credentials: 'same-origin' });
+        if (!resp.ok) {
+            console.error('Failed to fetch denoise files');
+            return;
+        }
+        const data = await resp.json();
+        const list = document.getElementById('denoise-files-list');
+        
+        if (!data.files || data.files.length === 0) {
+            list.innerHTML = '<div class="empty">No files yet</div>';
+            return;
+        }
+        
+        list.innerHTML = '';
+        data.files.forEach(file => {
+            const item = document.createElement('div');
+            item.className = 'recording-item';
+            item.style.flexDirection = 'column';
+            item.style.alignItems = 'flex-start';
+            item.style.gap = '0.5rem';
+            
+            const header = document.createElement('div');
+            header.style.width = '100%';
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
+            
+            const leftHeader = document.createElement('div');
+            leftHeader.style.display = 'flex';
+            leftHeader.style.flexDirection = 'column';
+            leftHeader.style.gap = '0.25rem';
+            
+            const fileName = document.createElement('div');
+            fileName.className = 'recording-title';
+            fileName.textContent = file.original_filename;
+            
+            const uploadDate = document.createElement('div');
+            uploadDate.className = 'muted';
+            uploadDate.style.fontSize = '0.85rem';
+            uploadDate.textContent = new Date(file.uploaded_at).toLocaleString();
+            
+            leftHeader.appendChild(fileName);
+            leftHeader.appendChild(uploadDate);
+            
+            // Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-delete-file';
+            deleteBtn.innerHTML = '<span>🗑️</span><span>Delete</span>';
+            deleteBtn.onclick = () => deleteDenoiseFile(file.id, file.original_filename);
+            
+            header.appendChild(leftHeader);
+            header.appendChild(deleteBtn);
+            
+            const filesRow = document.createElement('div');
+            filesRow.style.width = '100%';
+            filesRow.style.display = 'flex';
+            filesRow.style.gap = '1rem';
+            filesRow.style.alignItems = 'center';
+            
+            // Original file
+            const originalBox = document.createElement('div');
+            originalBox.style.flex = '1';
+            const originalLabel = document.createElement('div');
+            originalLabel.className = 'muted';
+            originalLabel.style.fontSize = '0.8rem';
+            originalLabel.style.marginBottom = '0.25rem';
+            originalLabel.textContent = '📁 Original';
+            const originalAudio = document.createElement('audio');
+            originalAudio.controls = true;
+            originalAudio.preload = 'none';
+            originalAudio.style.width = '100%';
+            originalAudio.style.maxWidth = '300px';
+            const originalSrc = document.createElement('source');
+            originalSrc.src = file.original_file_url;
+            originalSrc.type = 'audio/wav';
+            originalAudio.appendChild(originalSrc);
+            originalBox.appendChild(originalLabel);
+            originalBox.appendChild(originalAudio);
+            
+            // Denoised file
+            const denoisedBox = document.createElement('div');
+            denoisedBox.style.flex = '1';
+            const denoisedLabel = document.createElement('div');
+            denoisedLabel.className = 'muted';
+            denoisedLabel.style.fontSize = '0.8rem';
+            denoisedLabel.style.marginBottom = '0.25rem';
+            denoisedLabel.textContent = '✨ Denoised';
+            
+            if (file.status === 'completed' && file.denoised_file_url) {
+                const denoisedAudio = document.createElement('audio');
+                denoisedAudio.controls = true;
+                denoisedAudio.preload = 'none';
+                denoisedAudio.style.width = '100%';
+                denoisedAudio.style.maxWidth = '300px';
+                const denoisedSrc = document.createElement('source');
+                denoisedSrc.src = file.denoised_file_url;
+                denoisedSrc.type = 'audio/wav';
+                denoisedAudio.appendChild(denoisedSrc);
+                denoisedBox.appendChild(denoisedLabel);
+                denoisedBox.appendChild(denoisedAudio);
+            } else if (file.status === 'processing') {
+                const processingMsg = document.createElement('div');
+                processingMsg.style.padding = '0.5rem';
+                processingMsg.style.background = '#fef3c7';
+                processingMsg.style.color = '#92400e';
+                processingMsg.style.borderRadius = '6px';
+                processingMsg.style.fontSize = '0.9rem';
+                processingMsg.textContent = '⏳ In Process...';
+                denoisedBox.appendChild(denoisedLabel);
+                denoisedBox.appendChild(processingMsg);
+            } else if (file.status === 'failed') {
+                const errorMsg = document.createElement('div');
+                errorMsg.style.padding = '0.5rem';
+                errorMsg.style.background = '#fee2e2';
+                errorMsg.style.color = '#991b1b';
+                errorMsg.style.borderRadius = '6px';
+                errorMsg.style.fontSize = '0.9rem';
+                errorMsg.textContent = '❌ Failed';
+                denoisedBox.appendChild(denoisedLabel);
+                denoisedBox.appendChild(errorMsg);
+            } else {
+                const pendingMsg = document.createElement('div');
+                pendingMsg.style.padding = '0.5rem';
+                pendingMsg.style.background = '#e0e7ff';
+                pendingMsg.style.color = '#3730a3';
+                pendingMsg.style.borderRadius = '6px';
+                pendingMsg.style.fontSize = '0.9rem';
+                pendingMsg.textContent = '⏱️ Pending...';
+                denoisedBox.appendChild(denoisedLabel);
+                denoisedBox.appendChild(pendingMsg);
+            }
+            
+            filesRow.appendChild(originalBox);
+            filesRow.appendChild(denoisedBox);
+            
+            item.appendChild(header);
+            item.appendChild(filesRow);
+            list.appendChild(item);
+        });
+    } catch (e) {
+        console.error('Error refreshing denoise files:', e);
+    }
+}
+
+// Handle file upload
+document.getElementById('upload-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('audio-file-input');
+    const statusDiv = document.getElementById('upload-status');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        statusDiv.textContent = 'Please select a file';
+        statusDiv.style.color = '#991b1b';
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    
+    statusDiv.textContent = 'Uploading...';
+    statusDiv.style.color = '#6b7280';
+    
+    try {
+        const resp = await fetch('/api/denoise/upload/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData,
+            credentials: 'same-origin'
+        });
+        
+        if (!resp.ok) {
+            const error = await resp.json();
+            throw new Error(error.error || 'Upload failed');
+        }
+        
+        const data = await resp.json();
+        statusDiv.textContent = '✅ Uploaded! Processing will start shortly...';
+        statusDiv.style.color = '#059669';
+        
+        clearFileInput();
+        
+        // Refresh list after 1 second
+        setTimeout(() => {
+            refreshDenoiseFilesList();
+            statusDiv.textContent = '';
+        }, 1000);
+        
+        // Poll for updates every 3 seconds while files are processing
+        startDenoisePolling();
+        
+    } catch (e) {
+        statusDiv.textContent = '❌ ' + e.message;
+        statusDiv.style.color = '#991b1b';
+    }
+});
+
+// Poll for processing updates
+let denoisePollingInterval = null;
+
+function startDenoisePolling() {
+    if (denoisePollingInterval) return; // Already polling
+    
+    denoisePollingInterval = setInterval(async () => {
+        const resp = await fetch('/api/denoise/files/', { credentials: 'same-origin' });
+        if (resp.ok) {
+            const data = await resp.json();
+            const hasProcessing = data.files && data.files.some(f => f.status === 'processing' || f.status === 'pending');
+            
+            if (!hasProcessing) {
+                // Stop polling if no files are processing
+                clearInterval(denoisePollingInterval);
+                denoisePollingInterval = null;
+            }
+            
+            // Refresh the list
+            refreshDenoiseFilesList();
+        }
+    }, 3000); // Poll every 3 seconds
+}
+
+// Delete denoise file - show custom modal
+let deleteFileId = null;
+let deleteFileName = null;
+
+function deleteDenoiseFile(fileId, filename) {
+    deleteFileId = fileId;
+    deleteFileName = filename;
+    document.getElementById('delete-file-name').textContent = filename;
+    document.getElementById('delete-file-modal').classList.add('active');
+}
+
+function closeDeleteFileModal() {
+    document.getElementById('delete-file-modal').classList.remove('active');
+    deleteFileId = null;
+    deleteFileName = null;
+}
+
+async function confirmDeleteFile() {
+    if (!deleteFileId) return;
+    
+    try {
+        const resp = await fetch(`/api/denoise/files/${deleteFileId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin'
+        });
+        
+        if (!resp.ok) {
+            const error = await resp.json();
+            throw new Error(error.error || 'Failed to delete file');
+        }
+        
+        // Close modal
+        closeDeleteFileModal();
+        
+        // Refresh the list
+        await refreshDenoiseFilesList();
+        
+    } catch (e) {
+        closeDeleteFileModal();
+        // Show error in a nicer way
+        const statusDiv = document.getElementById('upload-status');
+        statusDiv.textContent = '❌ Error deleting file: ' + e.message;
+        statusDiv.style.color = '#991b1b';
+        setTimeout(() => {
+            statusDiv.textContent = '';
+        }, 5000);
+        console.error('Delete error:', e);
+    }
+}
+
+// Listen for global denoise modal trigger
+window.addEventListener('toggleDenoisePanel', openDenoiseModal);
 </script>
 {% endblock %}

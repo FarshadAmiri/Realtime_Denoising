@@ -49,6 +49,12 @@ urlpatterns = [
     path('api/stream/listener/<str:username>/offer/', stream_views.listener_offer, name='listener_offer'),
     path('api/recordings/', stream_views.recordings_list, name='recordings_list'),
     path('api/recordings/<str:username>/', stream_views.recordings_list, name='user_recordings_list'),
+    
+    # File denoising
+    path('api/denoise/upload/', stream_views.upload_audio_file, name='upload_audio_file'),
+    path('api/denoise/files/', stream_views.list_uploaded_files, name='list_uploaded_files'),
+    path('api/denoise/files/<int:file_id>/status/', stream_views.get_file_status, name='get_file_status'),
+    path('api/denoise/files/<int:file_id>/delete/', stream_views.delete_uploaded_file, name='delete_uploaded_file'),
 ]
 
 # Serve media files in development

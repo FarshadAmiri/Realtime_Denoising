@@ -162,10 +162,10 @@
 <body>
     <nav class="navbar">
         <div class="navbar-left">
+            <a href="{% url 'main_page' %}">🏠 Home</a>
             {% if user.is_authenticated %}
-            <span style="color: #ffd700; font-weight: 600; text-shadow: 0 2px 8px rgba(0,0,0,0.3);">@{{ user.username }}</span>
+            <a href="#" id="nav-denoise-file">🎵 Denoise a file</a>
             {% endif %}
-            <a href="{% url 'main_page' %}"> Home</a>
         </div>
         
         <a href="{% url 'main_page' %}" class="navbar-brand">
@@ -176,7 +176,7 @@
         <div class="navbar-links">
             {% if user.is_authenticated %}
                 {% if user.is_superuser or user.profile.user_level == 'admin' %}
-                <a href="{% url 'admin_panel' %}">Admin Panel</a>
+                <a href="{% url 'admin_panel' %}">⚡ Admin Panel</a>
                 {% endif %}
                 <a href="#" id="nav-friends">Friends</a>
                 <a href="{% url 'logout' %}">Logout</a>
@@ -202,6 +202,9 @@
         (function(){
             const link = document.getElementById('nav-friends');
             if(link){ link.addEventListener('click', function(e){ e.preventDefault(); window.dispatchEvent(new CustomEvent('toggleFriendsPanel')); }); }
+            
+            const denoiseLink = document.getElementById('nav-denoise-file');
+            if(denoiseLink){ denoiseLink.addEventListener('click', function(e){ e.preventDefault(); window.dispatchEvent(new CustomEvent('toggleDenoisePanel')); }); }
         })();
         </script>
 </body>
