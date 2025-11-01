@@ -18,7 +18,7 @@
         }
         
         .navbar { 
-            background: linear-gradient(90deg, #343434 0%,  #5f5f5f 100%);
+            background: linear-gradient(135deg, #434343 0%, #000000 100%);
             color: white; 
             font-size: 16px; 
             font-weight: 500; 
@@ -51,8 +51,8 @@
         }
         
         .navbar-brand:hover {
-            transform: translateX(-50%) scale(1.25);
-            text-shadow: 0 2px 12px rgba(210, 123, 57, 0.517);
+            transform: translateX(-50%) scale(1.15);
+            text-shadow: 0 2px 12px rgba(210, 169, 57, 0.517);
         }
         
         .mic-icon {
@@ -92,6 +92,15 @@
             border-color: rgba(255, 255, 255, 0.2);
             box-shadow: 0 2px 8px rgba(255, 255, 255, 0.27);
             transform: translateY(-1px);
+        }
+        
+        /* Logout button special styling */
+        .navbar-logout {
+            color: #ff6d6d !important;
+        }
+        
+        .navbar-logout:hover {
+            color: #f87171 !important;
         }
         
         .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
@@ -178,8 +187,8 @@
                 {% if user.is_superuser or user.profile.user_level == 'admin' %}
                 <a href="{% url 'admin_panel' %}">⚡ Admin Panel</a>
                 {% endif %}
-                <a href="#" id="nav-friends">Friends</a>
-                <a href="{% url 'logout' %}">Logout</a>
+                <a href="#" id="nav-friends">🧑🏻‍🤝‍🧑🏼 Friends</a>
+                <a href="{% url 'logout' %}" class="navbar-logout">🔸Logout</a>
             {% endif %}
         </div>
     </nav>
