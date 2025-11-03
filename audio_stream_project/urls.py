@@ -49,6 +49,8 @@ urlpatterns = [
     path('api/stream/listener/<str:username>/offer/', stream_views.listener_offer, name='listener_offer'),
     path('api/recordings/', stream_views.recordings_list, name='recordings_list'),
     path('api/recordings/<str:username>/', stream_views.recordings_list, name='user_recordings_list'),
+    path('api/recordings/<int:recording_id>/delete/', stream_views.delete_recording, name='delete_recording'),
+    path('api/recordings/<int:recording_id>/rename/', stream_views.rename_recording, name='rename_recording'),
     
     # File denoising
     path('api/denoise/upload/', stream_views.upload_audio_file, name='upload_audio_file'),

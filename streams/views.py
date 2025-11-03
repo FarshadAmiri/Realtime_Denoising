@@ -7,6 +7,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
+import logging
 
 from .models import StreamRecording, ActiveStream
 from .webrtc_handler import create_session, get_session_by_username, close_session
@@ -15,6 +16,8 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from .presence_store import set_online, is_online
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -256,6 +259,7 @@ def _recordings_data_for_user(user):
             'file_url': file_url,
             'duration': r.duration,
             'created_at': r.created_at.isoformat(),
+            'owner_username': r.owner.username,
         })
     return data
 
@@ -283,6 +287,67 @@ def recordings_list(request, username=None):
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=404)
     return Response(_recordings_data_for_user(user))
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_recording(request, recording_id):
+    """Delete a recording (only owner can delete)"""
+    try:
+        recording = StreamRecording.objects.get(id=recording_id)
+    except StreamRecording.DoesNotExist:
+        return Response({'error': 'Recording not found'}, status=404)
+    
+    # Check ownership
+    if recording.owner != request.user:
+        return Response({'error': 'You can only delete your own recordings'}, status=403)
+    
+    # Delete the file from storage
+    try:
+        if recording.file and recording.file.storage.exists(recording.file.name):
+            recording.file.delete(save=False)
+            logger.info(f"Deleted file for recording {recording_id}")
+    except Exception as e:
+        logger.error(f"Error deleting file for recording {recording_id}: {e}")
+    
+    # Delete the database record
+    recording.delete()
+    logger.info(f"User {request.user.username} deleted recording {recording_id}")
+    
+    return Response({'success': True, 'message': 'Recording deleted successfully'})
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def rename_recording(request, recording_id):
+    """Rename a recording (only owner can rename)"""
+    try:
+        recording = StreamRecording.objects.get(id=recording_id)
+    except StreamRecording.DoesNotExist:
+        return Response({'error': 'Recording not found'}, status=404)
+    
+    # Check ownership
+    if recording.owner != request.user:
+        return Response({'error': 'You can only rename your own recordings'}, status=403)
+    
+    # Get new title from request
+    new_title = request.data.get('title', '').strip()
+    if not new_title:
+        return Response({'error': 'Title cannot be empty'}, status=400)
+    
+    if len(new_title) > 255:
+        return Response({'error': 'Title too long (max 255 characters)'}, status=400)
+    
+    # Update title
+    recording.title = new_title
+    recording.save()
+    logger.info(f"User {request.user.username} renamed recording {recording_id} to '{new_title}'")
+    
+    return Response({
+        'success': True,
+        'title': recording.title,
+        'message': 'Recording renamed successfully'
+    })
 
 
 # Legacy endpoint placeholder; aiortc pipeline does not use chunk posts
