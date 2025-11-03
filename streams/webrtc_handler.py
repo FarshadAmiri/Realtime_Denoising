@@ -122,6 +122,7 @@ class WebRTCSession:
 
         self._consume_task: Optional[asyncio.Task] = None
         self._closed = False
+        self._recording_saved = False  # Flag to prevent duplicate saves
 
         self._recording_frames: list[np.ndarray] = []
         self._recording_sample_rate: Optional[int] = None
@@ -455,9 +456,18 @@ class WebRTCSession:
         return listener_pc.localDescription.sdp
 
     async def _save_recording(self):
+        # Prevent duplicate saves
+        if self._recording_saved:
+            print(f"Recording already saved for session {self.session_id}, skipping duplicate")
+            return
+        
         if not self._recording_frames or not self._recording_sample_rate:
             print(f"No audio frames to save for session {self.session_id}")
             return
+        
+        # Mark as saved immediately to prevent race conditions
+        self._recording_saved = True
+        
         try:
             import soundfile as sf
             import shutil

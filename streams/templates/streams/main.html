@@ -5,21 +5,112 @@
 {% block extra_css %}
 <style>
     .layout {
-                display: grid;
+        display: grid;
         grid-template-columns: 320px 1fr;
-                gap: 1.5rem;
-                height: calc(100vh - 160px);
-        }
-        .card { background: #fff; border-radius: 12px; }
-        .panel { padding: 1.25rem 1.25rem; }
-        .panel h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #1f2937; }
-        .divider { height: 1px; background: #f0f2f5; margin: 0.75rem 0 1rem; }
+        gap: 1.5rem;
+        height: calc(100vh - 160px);
+        overflow: hidden;
+    }
+    
+    .card { 
+        background: #fff; 
+        border-radius: 12px;
+    }
+    
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        max-height: 100%;
+    }
+    
+    .sidebar-header {
+        flex-shrink: 0;
+    }
+    
+    .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0.25rem 0.5rem 0.5rem 0.25rem;
+        margin-left: -0.25rem;
+    }
+    
+    .sidebar-content::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .sidebar-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .sidebar-content::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 3px;
+    }
+    
+    .sidebar-content::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+    }
+    
+    .panel { padding: 1.25rem 1.25rem; }
+    .panel h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #1f2937; }
+    .divider { height: 1px; background: #f0f2f5; margin: 0.75rem 0 1rem; }
+    
+    .friends-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    .friends-header-row h2 {
+        margin: 0;
+        flex-shrink: 0;
+    }
+    
+    .friends-search-box {
+        flex: 1;
+        position: relative;
+        min-width: 0;
+    }
+    
+    .friends-search-input {
+        width: 100%;
+        padding: 0.4rem 0.6rem 0.4rem 1.8rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        transition: all 0.15s ease;
+        outline: none;
+    }
+    
+    .friends-search-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
+    
+    .friends-search-input::placeholder {
+        color: #9ca3af;
+        font-size: 0.75rem;
+    }
+    
+    .friends-search-icon {
+        position: absolute;
+        left: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 0.85rem;
+        pointer-events: none;
+    }
 
-        /* Sidebar */
-        .sidebar .you-item { border: 2px ;background: linear-gradient(90deg, #d9d1ff, #ffc7c7); }
+    /* Sidebar */
+    .sidebar .you-item { border: 2px ;background: linear-gradient(90deg, #d9d1ff, #ffc7c7); }
         .friend-item { padding: 0.9rem; border-radius: 10px; cursor: pointer; transition: .15s ease; border: 1px solid #eef2f7; margin-bottom: 0.6rem; position: relative; display: flex; justify-content: space-between; align-items: center; }
         .friend-item:hover { background: #f3f3f3; }
-        .friend-item.active { outline: 2px solid #3b82f6; background: #eff6ff; }
+        .friend-item.active { outline: 2px solid #3b82f6; outline-offset: -2px; background: #eff6ff; }
         .you-item.active { background: linear-gradient(90deg, #d9d1ff, #ffc7c7); }
         .you-item:hover {  background: linear-gradient(90deg, #c4b9ff, #ffa5a5);  }
         .friend-name { font-weight: 600; color: #111827; }
@@ -65,10 +156,80 @@
             transition: transform .1s ease, box-shadow .15s ease, filter .2s ease;
             /* box-shadow: 0 12px 24px rgba(16, 185, 129, .25); */
             background: linear-gradient(135deg, #2262b1, #1e2971);
+            overflow: hidden;
         }
         .cta:hover { filter: brightness(1.05);}
         .cta:active { transform: translateY(1px); }
         .cta.stop { background: linear-gradient(135deg,#ef4444,#dc2626);}
+        
+        /* Sound wave animation for Start Streaming button */
+        #start-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        #start-btn::after {
+            content: '';
+            width: 48px;
+            height: 20px;
+            background-image: 
+                linear-gradient(to top, transparent 30%, rgba(79, 209, 197, 0.9) 30%, rgba(79, 209, 197, 0.9) 70%, transparent 70%),
+                linear-gradient(to top, transparent 20%, rgba(72, 187, 255, 0.9) 20%, rgba(72, 187, 255, 0.9) 80%, transparent 80%),
+                linear-gradient(to top, transparent 35%, rgba(130, 155, 255, 0.9) 35%, rgba(130, 155, 255, 0.9) 65%, transparent 65%),
+                linear-gradient(to top, transparent 15%, rgba(97, 218, 251, 0.9) 15%, rgba(97, 218, 251, 0.9) 85%, transparent 85%),
+                linear-gradient(to top, transparent 40%, rgba(167, 139, 250, 0.9) 40%, rgba(167, 139, 250, 0.9) 60%, transparent 60%),
+                linear-gradient(to top, transparent 25%, rgba(236, 72, 153, 0.9) 25%, rgba(236, 72, 153, 0.9) 75%, transparent 75%),
+                linear-gradient(to top, transparent 33%, rgba(34, 211, 238, 0.9) 33%, rgba(34, 211, 238, 0.9) 67%, transparent 67%);
+            background-size: 4px 100%, 4px 100%, 4px 100%, 4px 100%, 4px 100%, 4px 100%, 4px 100%;
+            background-position: 0 center, 7px center, 14px center, 21px center, 28px center, 35px center, 42px center;
+            background-repeat: no-repeat;
+            animation: soundWavePulse 1.25s ease-in-out infinite;
+        }
+        
+        @keyframes soundWavePulse {
+            0%, 100% {
+                background-image: 
+                    linear-gradient(to top, transparent 30%, rgba(79, 209, 197, 0.9) 30%, rgba(79, 209, 197, 0.9) 70%, transparent 70%),
+                    linear-gradient(to top, transparent 20%, rgba(72, 187, 255, 0.9) 20%, rgba(72, 187, 255, 0.9) 80%, transparent 80%),
+                    linear-gradient(to top, transparent 35%, rgba(130, 155, 255, 0.9) 35%, rgba(130, 155, 255, 0.9) 65%, transparent 65%),
+                    linear-gradient(to top, transparent 15%, rgba(97, 218, 251, 0.9) 15%, rgba(97, 218, 251, 0.9) 85%, transparent 85%),
+                    linear-gradient(to top, transparent 40%, rgba(167, 139, 250, 0.9) 40%, rgba(167, 139, 250, 0.9) 60%, transparent 60%),
+                    linear-gradient(to top, transparent 25%, rgba(236, 72, 153, 0.9) 25%, rgba(236, 72, 153, 0.9) 75%, transparent 75%),
+                    linear-gradient(to top, transparent 33%, rgba(34, 211, 238, 0.9) 33%, rgba(34, 211, 238, 0.9) 67%, transparent 67%);
+            }
+            25% {
+                background-image: 
+                    linear-gradient(to top, transparent 18%, rgba(79, 209, 197, 0.9) 18%, rgba(79, 209, 197, 0.9) 82%, transparent 82%),
+                    linear-gradient(to top, transparent 35%, rgba(72, 187, 255, 0.9) 35%, rgba(72, 187, 255, 0.9) 65%, transparent 65%),
+                    linear-gradient(to top, transparent 12%, rgba(130, 155, 255, 0.9) 12%, rgba(130, 155, 255, 0.9) 88%, transparent 88%),
+                    linear-gradient(to top, transparent 28%, rgba(97, 218, 251, 0.9) 28%, rgba(97, 218, 251, 0.9) 72%, transparent 72%),
+                    linear-gradient(to top, transparent 22%, rgba(167, 139, 250, 0.9) 22%, rgba(167, 139, 250, 0.9) 78%, transparent 78%),
+                    linear-gradient(to top, transparent 38%, rgba(236, 72, 153, 0.9) 38%, rgba(236, 72, 153, 0.9) 62%, transparent 62%),
+                    linear-gradient(to top, transparent 15%, rgba(34, 211, 238, 0.9) 15%, rgba(34, 211, 238, 0.9) 85%, transparent 85%);
+            }
+            50% {
+                background-image: 
+                    linear-gradient(to top, transparent 35%, rgba(79, 209, 197, 0.9) 35%, rgba(79, 209, 197, 0.9) 65%, transparent 65%),
+                    linear-gradient(to top, transparent 15%, rgba(72, 187, 255, 0.9) 15%, rgba(72, 187, 255, 0.9) 85%, transparent 85%),
+                    linear-gradient(to top, transparent 28%, rgba(130, 155, 255, 0.9) 28%, rgba(130, 155, 255, 0.9) 72%, transparent 72%),
+                    linear-gradient(to top, transparent 38%, rgba(97, 218, 251, 0.9) 38%, rgba(97, 218, 251, 0.9) 62%, transparent 62%),
+                    linear-gradient(to top, transparent 10%, rgba(167, 139, 250, 0.9) 10%, rgba(167, 139, 250, 0.9) 90%, transparent 90%),
+                    linear-gradient(to top, transparent 32%, rgba(236, 72, 153, 0.9) 32%, rgba(236, 72, 153, 0.9) 68%, transparent 68%),
+                    linear-gradient(to top, transparent 25%, rgba(34, 211, 238, 0.9) 25%, rgba(34, 211, 238, 0.9) 75%, transparent 75%);
+            }
+            75% {
+                background-image: 
+                    linear-gradient(to top, transparent 22%, rgba(79, 209, 197, 0.9) 22%, rgba(79, 209, 197, 0.9) 78%, transparent 78%),
+                    linear-gradient(to top, transparent 32%, rgba(72, 187, 255, 0.9) 32%, rgba(72, 187, 255, 0.9) 68%, transparent 68%),
+                    linear-gradient(to top, transparent 40%, rgba(130, 155, 255, 0.9) 40%, rgba(130, 155, 255, 0.9) 60%, transparent 60%),
+                    linear-gradient(to top, transparent 20%, rgba(97, 218, 251, 0.9) 20%, rgba(97, 218, 251, 0.9) 80%, transparent 80%),
+                    linear-gradient(to top, transparent 30%, rgba(167, 139, 250, 0.9) 30%, rgba(167, 139, 250, 0.9) 70%, transparent 70%),
+                    linear-gradient(to top, transparent 15%, rgba(236, 72, 153, 0.9) 15%, rgba(236, 72, 153, 0.9) 85%, transparent 85%),
+                    linear-gradient(to top, transparent 35%, rgba(34, 211, 238, 0.9) 35%, rgba(34, 211, 238, 0.9) 65%, transparent 65%);
+            }
+        }
 
         .cta-listen {
             position: relative;
@@ -127,6 +288,21 @@
         .modal-btn:hover { filter: brightness(0.95); }
         .modal-btn-cancel { background: #e5e7eb; color: #374151; }
         .modal-btn-danger { background: #ef4444; color: #fff; }
+        
+        /* Alert Modal */
+        .alert-modal-box { background: #fff; border-radius: 16px; padding: 1.75rem; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+        .alert-icon { font-size: 3.5rem; margin-bottom: 1rem; line-height: 1; }
+        .alert-icon.success { color: #10b981; }
+        .alert-icon.error { color: #ef4444; }
+        .alert-icon.info { color: #3b82f6; }
+        .alert-title { font-size: 1.35rem; font-weight: 700; color: #111827; margin-bottom: 0.65rem; }
+        .alert-message { color: #6b7280; margin-bottom: 1.5rem; line-height: 1.5; }
+        .alert-btn { width: 100%; border: none; border-radius: 10px; padding: 0.75rem 1.5rem; font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; }
+        .alert-btn.success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; }
+        .alert-btn.error { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: #fff; }
+        .alert-btn.info { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #fff; }
+        .alert-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .alert-btn:active { transform: translateY(0); }
         
         /* Friends Modal */
         .friends-modal-box { background: #fff; border-radius: 16px; padding: 1.5rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
@@ -265,7 +441,8 @@
 <div class="layout">
     <!-- Sidebar -->
     <div class="card panel sidebar">
-        <h2>Your Profile</h2>
+        <div class="sidebar-header">
+            <h2>Your Profile</h2>
             <div class="friend-item you-item" data-username="{{ user.username }}" onclick="selectEntry('{{ user.username }}', true)">
                 <div class="friend-name">{{ user.username }} <span class="user-chip">You</span></div>
                 <div class="friend-meta">
@@ -281,10 +458,18 @@
                     {% endif %}
                 </div>
             </div>
-        <div class="divider"></div>
-        <h2>{% if user.is_superuser or user.profile.user_level == 'admin' %}Users{% else %}Friends{% endif %}</h2>
-        <div id="friends-list">
-            {% for friend in friends %}
+            <div class="divider"></div>
+            <div class="friends-header-row">
+                <h2>{% if user.is_superuser or user.profile.user_level == 'admin' %}Users{% else %}Friends{% endif %}</h2>
+                <div class="friends-search-box">
+                    <span class="friends-search-icon">🔍</span>
+                    <input type="text" class="friends-search-input" id="sidebar-search" placeholder="Search..." oninput="filterFriendsList()">
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-content">
+            <div id="friends-list">
+                {% for friend in friends %}
                     <div class="friend-item" data-username="{{ friend.username }}">
                         <div class="friend-info" onclick="selectEntry('{{ friend.username }}', false)">
                             <div class="friend-name">{{ friend.username }}</div>
@@ -308,9 +493,10 @@
                             </div>
                         </div>
                     </div>
-            {% empty %}
-            <div class="empty">No friends yet</div>
-            {% endfor %}
+                {% empty %}
+                <div class="empty">No friends yet</div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
@@ -342,7 +528,7 @@
             {% else %}
             <div style="padding: 1rem; border:1px solid #fee2e2; border-radius:12px; background:#fef2f2; color:#991b1b; text-align:center;">
                 <strong>⚠ Streaming Disabled</strong><br>
-                <span style="font-size:0.875rem;">Your account does not have permission to stream. Please contact an administrator.</span>
+                <span style="font-size:0.875rem;">Your account does not have permission to stream.</span>
             </div>
             {% endif %}
         </div>
@@ -395,6 +581,16 @@
             <button class="modal-btn modal-btn-cancel" onclick="closeUnfriendModal()">Cancel</button>
             <button class="modal-btn modal-btn-danger" onclick="confirmUnfriend()">Unfriend</button>
         </div>
+    </div>
+</div>
+
+<!-- Alert Modal -->
+<div id="alert-modal" class="modal-overlay" onclick="if(event.target === this) closeAlertModal()">
+    <div class="alert-modal-box">
+        <div class="alert-icon" id="alert-icon">✓</div>
+        <div class="alert-title" id="alert-title">Success</div>
+        <div class="alert-message" id="alert-message">Operation completed successfully</div>
+        <button class="alert-btn success" id="alert-btn" onclick="closeAlertModal()">OK</button>
     </div>
 </div>
 
@@ -470,6 +666,17 @@ const currentUser = "{{ user.username }}";
 let browserAudioProcessing = true; // will be set after cfg JSON is loaded in the next script
 const currentOnlineCache = new Map();
 
+// Load selection history from localStorage (persistent across sessions)
+let selectionHistory = [];
+try {
+    const stored = localStorage.getItem('selectionHistory_' + currentUser);
+    if (stored) {
+        selectionHistory = JSON.parse(stored);
+    }
+} catch (e) {
+    console.warn('Failed to load selection history:', e);
+}
+
 function connectPresence() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     presenceSocket = new WebSocket(proto + '//' + location.host + '/ws/presence/');
@@ -496,13 +703,25 @@ function connectPresence() {
             }
         } else if (data.type === 'stream_ended') {
             // If listener is watching this stream, show message and stop
-            if (data.username === selectedUsername && !isOwnerView && peerConnection) {
-                document.getElementById('listen-status').textContent = 'Audio stream finished.';
+            console.log('[WebSocket] Stream ended event received:', data.username, 'selectedUsername:', selectedUsername, 'isOwnerView:', isOwnerView, 'peerConnection:', !!peerConnection);
+            if (data.username === selectedUsername && !isOwnerView) {
+                console.log('[WebSocket] Handling stream end for listener');
+                document.getElementById('listen-status').textContent = 'Stream ended. Loading recording...';
                 document.getElementById('listen-status').style.color = '#ef4444';
-                setTimeout(() => {
+                
+                // Stop listening if currently listening
+                if (peerConnection) {
                     stopListening();
+                }
+                
+                // Refresh recordings to show the newly saved recording
+                // Wait a bit longer to ensure backend has saved the recording
+                setTimeout(() => {
+                    console.log('[WebSocket] Refreshing recordings after stream end');
+                    document.getElementById('listen-status').textContent = '';
                     document.getElementById('listen-status').style.color = '';
-                }, 3000);
+                    refreshRecordings();
+                }, 2000);
             }
         } else if (data.type === 'recording_saved') {
             // If viewing this user's page, add new recording without refresh
@@ -618,11 +837,33 @@ function selectEntry(username, isSelf){
         stopListening();
     }
     
-    // Deselect previous
-    document.querySelectorAll('.friend-item').forEach(i=>i.classList.remove('active'));
-    document.querySelector(`.friend-item[data-username="${username}"]`)?.classList.add('active');
+    // Update selection history (move to front if exists, otherwise add to front)
+    const historyIndex = selectionHistory.indexOf(username);
+    if (historyIndex > -1) {
+        selectionHistory.splice(historyIndex, 1);
+    }
+    selectionHistory.unshift(username);
+    // Keep only last 50 selections to avoid memory issues
+    if (selectionHistory.length > 50) {
+        selectionHistory = selectionHistory.slice(0, 50);
+    }
+    
+    // Save to localStorage for persistence across sessions
+    try {
+        localStorage.setItem('selectionHistory_' + currentUser, JSON.stringify(selectionHistory));
+    } catch (e) {
+        console.warn('Failed to save selection history:', e);
+    }
+    
     selectedUsername = username;
     isOwnerView = isSelf;
+    
+    // Remove active class from all items (including "Your Profile")
+    document.querySelectorAll('.friend-item').forEach(i => i.classList.remove('active'));
+    
+    // Apply active state to selected item (do NOT refresh the list to maintain order during session)
+    document.querySelector(`.friend-item[data-username="${username}"]`)?.classList.add('active');
+    
     document.getElementById('content-title').textContent = username;
     document.getElementById('content-sub').textContent = isSelf ? 'Manage your stream and recordings' : 'Listen live and browse recordings';
     document.getElementById('owner-controls').style.display = isSelf ? 'block' : 'none';
@@ -655,40 +896,199 @@ function getCookie(name){
 }
 
 async function startStream(){
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const denoiseToggle = document.getElementById('denoise-toggle');
+    const denoiseBtn = document.getElementById('denoise-btn');
+    const statusEl = document.getElementById('stream-status');
+    
     try{
-        document.getElementById('stream-status').textContent='Starting stream...';
-        const denoise = document.getElementById('denoise-toggle').checked;
-        const resp = await fetch('/api/stream/start/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({denoise})});
+        statusEl.textContent = 'Starting stream...';
+        const denoise = denoiseToggle.checked;
+        
+        const resp = await fetch('/api/stream/start/', {
+            method:'POST', 
+            headers:{
+                'Content-Type':'application/json',
+                'X-CSRFToken':getCookie('csrftoken')
+            }, 
+            body: JSON.stringify({denoise})
+        });
         if(!resp.ok) throw new Error('Failed to start stream');
-        localStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:{ideal:1}, sampleRate:{ideal:48000}, echoCancellation:browserAudioProcessing, noiseSuppression:browserAudioProcessing, autoGainControl:browserAudioProcessing}, video:false});
+        
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio:{
+                channelCount:{ideal:1}, 
+                sampleRate:{ideal:48000}, 
+                echoCancellation:browserAudioProcessing, 
+                noiseSuppression:browserAudioProcessing, 
+                autoGainControl:browserAudioProcessing
+            }, 
+            video:false
+        });
+        
         peerConnection = new RTCPeerConnection({ iceServers:[{urls:'stun:stun.l.google.com:19302'}] });
-        localStream.getTracks().forEach(t=>{ const s=peerConnection.addTrack(t, localStream); try{ const p=s.getParameters(); if(!p.encodings)p.encodings=[{}]; p.encodings[0].maxBitrate=192000; s.setParameters(p);}catch(e){} });
+        localStream.getTracks().forEach(t=>{ 
+            const s=peerConnection.addTrack(t, localStream); 
+            try{ 
+                const p=s.getParameters(); 
+                if(!p.encodings)p.encodings=[{}]; 
+                p.encodings[0].maxBitrate=192000; 
+                s.setParameters(p);
+            }catch(e){} 
+        });
+        
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         await waitForIceGathering(peerConnection);
-        const offerResp = await fetch('/api/stream/offer/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({ sdp: peerConnection.localDescription.sdp })});
+        
+        const offerResp = await fetch('/api/stream/offer/', {
+            method:'POST', 
+            headers:{
+                'Content-Type':'application/json',
+                'X-CSRFToken':getCookie('csrftoken')
+            }, 
+            body: JSON.stringify({ sdp: peerConnection.localDescription.sdp })
+        });
         if(!offerResp.ok) throw new Error('Failed to negotiate');
+        
         const answer = await offerResp.json();
         await peerConnection.setRemoteDescription({type:'answer', sdp:answer.sdp});
-        document.getElementById('start-btn').style.display='none';
-        document.getElementById('stop-btn').style.display='inline-block';
-        document.getElementById('denoise-toggle').disabled=true;
-        document.getElementById('stream-status').textContent='Streaming...';
+        
+        // Update UI - stream started successfully
+        if(startBtn) startBtn.style.display = 'none';
+        if(stopBtn) stopBtn.style.display = 'inline-block';
+        if(denoiseToggle) denoiseToggle.disabled = true;
+        if(denoiseBtn) denoiseBtn.disabled = true;
+        statusEl.textContent = 'Streaming...';
         startTimer();
-    }catch(e){ document.getElementById('stream-status').textContent='Error: '+e.message; }
+        
+    }catch(e){ 
+        statusEl.textContent = 'Error: ' + e.message;
+        // Clean up on error
+        if(peerConnection) {
+            try { peerConnection.close(); } catch(err) {}
+            peerConnection = null;
+        }
+        if(localStream) {
+            try { localStream.getTracks().forEach(t => t.stop()); } catch(err) {}
+            localStream = null;
+        }
+    }
 }
 
 async function stopStream(){
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const denoiseToggle = document.getElementById('denoise-toggle');
+    const denoiseBtn = document.getElementById('denoise-btn');
+    const statusEl = document.getElementById('stream-status');
+    const timerEl = document.getElementById('timer');
+    
+    // Prevent double-clicking
+    if(stopBtn && stopBtn.disabled) {
+        console.log('Stop button already disabled, ignoring click');
+        return;
+    }
+    if(stopBtn) stopBtn.disabled = true;
+    
+    // Function to reset UI
+    function resetUI(message) {
+        console.log('Resetting UI:', message);
+        if(startBtn) startBtn.style.display = 'inline-flex';
+        if(stopBtn) {
+            stopBtn.style.display = 'none';
+            stopBtn.disabled = false;
+        }
+        if(denoiseToggle) denoiseToggle.disabled = false;
+        if(denoiseBtn) denoiseBtn.disabled = false;
+        if(timerEl) timerEl.textContent = '00:00';
+        if(statusEl) statusEl.textContent = message || 'Stream stopped.';
+    }
+    
     try{
-        cleanupPeer();
-        const resp = await fetch('/api/stream/stop/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({})});
-        if(!resp.ok) throw new Error('Failed to stop stream');
-        document.getElementById('start-btn').style.display='inline-block';
-        document.getElementById('stop-btn').style.display='none';
-        document.getElementById('denoise-toggle').disabled=false;
-        document.getElementById('stream-status').textContent='Stream stopped.';
-        refreshRecordings();
-    }catch(e){ document.getElementById('stream-status').textContent='Error: '+e.message; }
+        console.log('[stopStream] Starting stop process...');
+        if(statusEl) statusEl.textContent = 'Stopping stream...';
+        
+        // Cleanup peer connection and streams FIRST
+        console.log('[stopStream] Cleaning up peer connection and streams...');
+        if(peerConnection){
+            try{ 
+                peerConnection.getSenders().forEach(s => {
+                    if(s.track) s.track.stop();
+                });
+                peerConnection.close(); 
+            }catch(e){
+                console.error('[stopStream] Error closing peer connection:', e);
+            }
+        }
+        
+        if(localStream){
+            try{
+                localStream.getTracks().forEach(track => track.stop());
+            }catch(e){
+                console.error('[stopStream] Error stopping tracks:', e);
+            }
+        }
+        
+        peerConnection = null;
+        localStream = null;
+        stopTimer();
+        console.log('[stopStream] Cleanup complete');
+        
+        // Send stop request with timeout
+        console.log('[stopStream] Sending stop request to backend...');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        try {
+            const resp = await fetch('/api/stream/stop/', {
+                method: 'POST', 
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }, 
+                body: JSON.stringify({}),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
+            console.log('[stopStream] Stop response status:', resp.status);
+            if(!resp.ok){
+                const errorText = await resp.text();
+                console.error('[stopStream] Stop failed:', errorText);
+                // Don't throw - just log and continue with UI update
+            } else {
+                console.log('[stopStream] Backend acknowledged stop successfully');
+            }
+        } catch(fetchError) {
+            clearTimeout(timeoutId);
+            if(fetchError.name === 'AbortError') {
+                console.warn('[stopStream] Stop request timed out - continuing with UI update');
+            } else {
+                console.error('[stopStream] Fetch error:', fetchError);
+            }
+            // Don't throw - continue with UI update
+        }
+        
+        console.log('[stopStream] Resetting UI...');
+        resetUI('Stream stopped.');
+        
+        console.log('[stopStream] Refreshing recordings...');
+        try {
+            await refreshRecordings();
+            console.log('[stopStream] Recordings refreshed successfully');
+        } catch(refreshError) {
+            console.error('[stopStream] Failed to refresh recordings:', refreshError);
+            // Don't fail the whole operation if refresh fails
+        }
+        
+        console.log('[stopStream] Stop process complete!');
+        
+    }catch(e){ 
+        console.error('[stopStream] Error in stopStream:', e);
+        resetUI('Error: ' + e.message);
+    }
 }
 
 async function startListening(){
@@ -719,28 +1119,76 @@ function startTimer(){ startTime=Date.now(); timerInterval=setInterval(()=>{ con
 function stopTimer(){ if(timerInterval){ clearInterval(timerInterval); timerInterval=null; } document.getElementById('timer').textContent='00:00'; }
 
 async function refreshRecordings(){
+    console.log('[refreshRecordings] Starting to refresh recordings list...');
     const list = document.getElementById('recordings-list');
     const empty = document.getElementById('no-recordings');
-    list.innerHTML=''; empty.style.display='none';
+    
+    if(!list || !empty) {
+        console.warn('[refreshRecordings] Required DOM elements not found');
+        return;
+    }
+    
+    list.innerHTML=''; 
+    empty.style.display='none';
+    
     if(!selectedUsername){
         // ensure selection; default to current user
         selectedUsername = currentUser;
     }
+    
+    console.log('[refreshRecordings] Fetching recordings for:', selectedUsername);
     const url = `/api/recordings/${encodeURIComponent(selectedUsername)}/`;
-    const resp = await fetch(url, { credentials: 'same-origin' });
-    if(!resp.ok){ empty.textContent='Unable to load recordings'; empty.style.display='block'; console.error('Recordings fetch failed', resp.status); return; }
-    const data = await resp.json();
-    const recs = Array.isArray(data) ? data : (data.results || []);
-    if(!recs.length){ empty.style.display='block'; return; }
-    for(const r of recs){
-        const item = document.createElement('div'); item.className='recording-item';
-        const left = document.createElement('div');
-        const title = document.createElement('div'); title.className='recording-title'; title.textContent = r.title || 'Recording';
-        const meta = document.createElement('div'); meta.className='muted'; meta.textContent = (r.duration?`Duration: ${r.duration}s | `:'') + (r.created_at? new Date(r.created_at).toLocaleString() : '');
-        left.appendChild(title); left.appendChild(meta);
-        const right = document.createElement('div');
-        if(r.file_url){ const audio = document.createElement('audio'); audio.controls=true; audio.preload='none'; const src=document.createElement('source'); src.src=r.file_url; src.type='audio/wav'; audio.appendChild(src); right.appendChild(audio); } else { right.textContent='No file'; right.className='muted'; }
-        item.appendChild(left); item.appendChild(right); list.appendChild(item);
+    
+    try {
+        // Add timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        
+        const resp = await fetch(url, { 
+            credentials: 'same-origin',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        console.log('[refreshRecordings] Response status:', resp.status);
+        
+        if(!resp.ok){ 
+            empty.textContent='Unable to load recordings'; 
+            empty.style.display='block'; 
+            console.error('[refreshRecordings] Fetch failed', resp.status); 
+            return; 
+        }
+        
+        const data = await resp.json();
+        const recs = Array.isArray(data) ? data : (data.results || []);
+        console.log('[refreshRecordings] Received', recs.length, 'recordings');
+        
+        if(!recs.length){ 
+            empty.style.display='block'; 
+            console.log('[refreshRecordings] No recordings to display');
+            return; 
+        }
+        
+        for(const r of recs){
+            const item = document.createElement('div'); item.className='recording-item';
+            const left = document.createElement('div');
+            const title = document.createElement('div'); title.className='recording-title'; title.textContent = r.title || 'Recording';
+            const meta = document.createElement('div'); meta.className='muted'; meta.textContent = (r.duration?`Duration: ${r.duration}s | `:'') + (r.created_at? new Date(r.created_at).toLocaleString() : '');
+            left.appendChild(title); left.appendChild(meta);
+            const right = document.createElement('div');
+            if(r.file_url){ const audio = document.createElement('audio'); audio.controls=true; audio.preload='none'; const src=document.createElement('source'); src.src=r.file_url; src.type='audio/wav'; audio.appendChild(src); right.appendChild(audio); } else { right.textContent='No file'; right.className='muted'; }
+            item.appendChild(left); item.appendChild(right); list.appendChild(item);
+        }
+        console.log('[refreshRecordings] Successfully rendered', recs.length, 'recordings');
+        
+    } catch(err) {
+        console.error('[refreshRecordings] Error:', err);
+        if(err.name === 'AbortError') {
+            empty.textContent='Request timed out - please try again';
+        } else {
+            empty.textContent='Unable to load recordings';
+        }
+        empty.style.display='block';
     }
 }
 
@@ -769,8 +1217,30 @@ async function undoReq(username){
 }
 
 async function refreshFriendsList(){
-    const r=await fetch('/api/friends/list/', { credentials: 'same-origin' }); if(!r.ok){ console.error('Friends list fetch failed', r.status); return; } const j=await r.json(); const box=document.getElementById('friends-list'); box.innerHTML='';
-    (j.friends||[]).forEach(f=>{
+    const r=await fetch('/api/friends/list/', { credentials: 'same-origin' }); if(!r.ok){ console.error('Friends list fetch failed', r.status); return; } const j=await r.json(); 
+    
+    // Sort friends based on selection history (most recently selected first)
+    const friends = j.friends || [];
+    friends.sort((a, b) => {
+        const aIndex = selectionHistory.indexOf(a.username);
+        const bIndex = selectionHistory.indexOf(b.username);
+        
+        // If both in history, sort by history order
+        if (aIndex !== -1 && bIndex !== -1) {
+            return aIndex - bIndex;
+        }
+        // If only a in history, a comes first
+        if (aIndex !== -1) return -1;
+        // If only b in history, b comes first
+        if (bIndex !== -1) return 1;
+        // Neither in history, keep original order (or alphabetically)
+        return a.username.localeCompare(b.username);
+    });
+    
+    const box=document.getElementById('friends-list'); 
+    box.innerHTML='';
+    
+    friends.forEach(f=>{
         currentOnlineCache.set(f.username, !!f.is_online);
         const d=document.createElement('div'); d.className='friend-item'; d.dataset.username=f.username;
         let statusHTML = '';
@@ -781,6 +1251,21 @@ async function refreshFriendsList(){
         const friendLabel = (f.is_friend !== undefined && f.is_friend) ? ' <span style="color:#777;font-size:0.9rem;">(friend)</span>' : '';
         d.innerHTML=`<div class=\"friend-info\" onclick=\"selectEntry('${f.username}', false)\"><div class=\"friend-name\">${f.username}${friendLabel}</div><div class=\"friend-meta\">${statusHTML}</div></div><div style=\"position: relative;\"><button class=\"friend-options-btn\" onclick=\"event.stopPropagation(); toggleFriendMenu('${f.username}')\">⋮</button><div class=\"friend-options-menu\" id=\"friend-menu-${f.username}\"><div class=\"friend-options-menu-item danger\" onclick=\"event.stopPropagation(); showUnfriendModal('${f.username}')\">Unfriend</div></div></div>`; 
         box.appendChild(d);
+    });
+}
+
+function filterFriendsList() {
+    const searchInput = document.getElementById('sidebar-search');
+    const query = searchInput.value.toLowerCase().trim();
+    const friendItems = document.querySelectorAll('.friend-item:not(.you-item)');
+    
+    friendItems.forEach(item => {
+        const username = item.dataset.username.toLowerCase();
+        if (username.includes(query)) {
+            item.style.display = '';
+        } else {
+            item.style.display = 'none';
+        }
     });
 }
 
@@ -797,8 +1282,36 @@ function closeUnfriendModal() {
     unfriendTargetUsername = null;
 }
 
+function showAlertModal(type, title, message) {
+    const modal = document.getElementById('alert-modal');
+    const icon = document.getElementById('alert-icon');
+    const titleEl = document.getElementById('alert-title');
+    const messageEl = document.getElementById('alert-message');
+    const btn = document.getElementById('alert-btn');
+    
+    // Set icon based on type
+    const icons = { success: '✓', error: '✕', info: 'ℹ' };
+    icon.textContent = icons[type] || icons.info;
+    icon.className = `alert-icon ${type}`;
+    
+    // Set content
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // Set button style
+    btn.className = `alert-btn ${type}`;
+    
+    // Show modal
+    modal.classList.add('active');
+}
+
+function closeAlertModal() {
+    document.getElementById('alert-modal').classList.remove('active');
+}
+
 async function confirmUnfriend() {
     if (!unfriendTargetUsername) return;
+    const username = unfriendTargetUsername;
     try {
         const resp = await fetch('/api/friends/unfriend/', {
             method: 'POST',
@@ -806,18 +1319,32 @@ async function confirmUnfriend() {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ username: unfriendTargetUsername })
+            body: JSON.stringify({ username: username })
         });
-        if (!resp.ok) throw new Error('Failed to unfriend');
+        const data = await resp.json();
         closeUnfriendModal();
+        
+        if (!resp.ok) {
+            // Show error alert
+            if (resp.status === 400 && data.error) {
+                showAlertModal('error', 'Cannot Unfriend', data.error);
+            } else {
+                showAlertModal('error', 'Failed to Unfriend', data.error || 'An error occurred while trying to unfriend this user.');
+            }
+            return;
+        }
+        
+        // Show success alert
+        showAlertModal('success', 'Unfriended Successfully', `You have unfriended ${username}.`);
+        
         // If viewing the unfriended user's page, switch back to self
-        if (selectedUsername === unfriendTargetUsername) {
+        if (selectedUsername === username) {
             selectEntry(currentUser, true);
         }
         refreshFriendsList();
     } catch (e) {
-        alert('Error: ' + e.message);
         closeUnfriendModal();
+        showAlertModal('error', 'Error', 'An unexpected error occurred: ' + e.message);
     }
 }
 
