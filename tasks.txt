@@ -1,24 +1,10 @@
+* Add these modes to denoise a file:
 
+    ** separate bcg audio and over voice
 
+    ** amplify an audio
 
+* RestAPI for denoise a file (or with its modes)
 
--------
-Done:
+* separate a specific person voice from an audio
 
-* online-offline status of users should be update in real-time
-
-* when user is not streaming, shouldn't show start listening for the other users.
-
-* in friends section, when a friend name appears it should says already friend.
-+ if request sent but the other user has not yet accepted, show request sent.
-+ if the other user has rejected, the request is dismissed so it should show 
-option of sending friend request.
-
-* you should be able to undo a friend request before the other user action (accept or reject).
-
-* user cannot not be able to abandon its page and open up his friends pages when streaming.
-
-* stop listening when user changes the page (goes to one of his friends pages).
-
-* when stream finishes, "Audio stream finished" appears for listeners and listening stops.
-+ new saved audio should appear for them in saved audios when it is ready (so no need to refresh the page).
