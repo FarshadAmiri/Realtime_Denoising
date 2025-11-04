@@ -2,6 +2,8 @@
 
 Stream audio to your friends with AI-powered noise removal using DeepFilterNet2.
 
+![ClearCast UI](screenshot.png)
+
 ## What it does
 
 - Uses DeepFilterNet2 for the actual denoising.
