@@ -184,7 +184,7 @@
     /* Delete confirmation modal */
     .delete-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000; animation: fadeIn 0.2s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .delete-modal { background: white; border-radius: 16px; padding: 1.1; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: slideUp 0.3s ease; }
+    .delete-modal { background: white; border-radius: 16px; padding: 2rem; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: slideUp 0.3s ease; }
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .delete-modal-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
     .delete-modal-icon { font-size: 2rem; }
@@ -228,7 +228,7 @@
             cursor: pointer;
             transition: transform .1s ease, box-shadow .15s ease, filter .2s ease;
             /* box-shadow: 0 12px 24px rgba(16, 185, 129, .25); */
-            background: linear-gradient(135deg, #2262b1, #1e2971);
+            background: linear-gradient(135deg, #2e77d0, #583ebe);
             overflow: hidden;
         }
         .cta:hover { filter: brightness(1.05);}
@@ -1929,19 +1929,22 @@ async function refreshDenoiseFilesList() {
             const item = document.createElement('div');
             item.className = 'recording-item';
             item.style.flexDirection = 'column';
-            item.style.alignItems = 'flex-start';
-            item.style.gap = '0.5rem';
+            item.style.alignItems = 'stretch';
+            item.style.gap = '0.75rem';
+            item.style.padding = '1rem';
             
             const header = document.createElement('div');
             header.style.width = '100%';
             header.style.display = 'flex';
             header.style.justifyContent = 'space-between';
             header.style.alignItems = 'center';
+            header.style.marginBottom = '0.5rem';
             
             const leftHeader = document.createElement('div');
             leftHeader.style.display = 'flex';
             leftHeader.style.flexDirection = 'column';
             leftHeader.style.gap = '0.25rem';
+            leftHeader.style.flex = '1';
             
             const fileName = document.createElement('div');
             fileName.className = 'recording-title';
@@ -1958,9 +1961,10 @@ async function refreshDenoiseFilesList() {
             // Delete button
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn-delete-file';
-            // deleteBtn.innerHTML = '<span>🗑️</span><span>Delete</span>';
             deleteBtn.innerHTML = '<span>❌</span>';
             deleteBtn.onclick = () => deleteDenoiseFile(file.id, file.original_filename);
+            deleteBtn.style.marginLeft = '1rem';
+            deleteBtn.style.flexShrink = '0';
             
             header.appendChild(leftHeader);
             header.appendChild(deleteBtn);
@@ -1968,12 +1972,15 @@ async function refreshDenoiseFilesList() {
             const filesRow = document.createElement('div');
             filesRow.style.width = '100%';
             filesRow.style.display = 'flex';
-            filesRow.style.gap = '1rem';
-            filesRow.style.alignItems = 'center';
+            filesRow.style.gap = '1.5rem';
+            filesRow.style.alignItems = 'flex-start';
+            filesRow.style.flexWrap = 'wrap';
             
             // Original file
             const originalBox = document.createElement('div');
-            originalBox.style.flex = '1';
+            originalBox.style.flex = '1 1 250px';
+            originalBox.style.minWidth = '250px';
+            originalBox.style.maxWidth = '350px';
             const originalLabel = document.createElement('div');
             originalLabel.className = 'muted';
             originalLabel.style.fontSize = '0.8rem';
@@ -1983,7 +1990,6 @@ async function refreshDenoiseFilesList() {
             originalAudio.controls = true;
             originalAudio.preload = 'none';
             originalAudio.style.width = '100%';
-            originalAudio.style.maxWidth = '300px';
             const originalSrc = document.createElement('source');
             originalSrc.src = file.original_file_url;
             originalSrc.type = 'audio/wav';
@@ -1993,7 +1999,9 @@ async function refreshDenoiseFilesList() {
             
             // Denoised file
             const denoisedBox = document.createElement('div');
-            denoisedBox.style.flex = '1';
+            denoisedBox.style.flex = '1 1 250px';
+            denoisedBox.style.minWidth = '250px';
+            denoisedBox.style.maxWidth = '350px';
             const denoisedLabel = document.createElement('div');
             denoisedLabel.className = 'muted';
             denoisedLabel.style.fontSize = '0.8rem';
@@ -2005,7 +2013,6 @@ async function refreshDenoiseFilesList() {
                 denoisedAudio.controls = true;
                 denoisedAudio.preload = 'none';
                 denoisedAudio.style.width = '100%';
-                denoisedAudio.style.maxWidth = '300px';
                 const denoisedSrc = document.createElement('source');
                 denoisedSrc.src = file.denoised_file_url;
                 denoisedSrc.type = 'audio/wav';
