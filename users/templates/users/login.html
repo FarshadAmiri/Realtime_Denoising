@@ -2,22 +2,45 @@
 
 {% block title %}Login - Audio Stream{% endblock %}
 
+{% block extra_css %}
+<style>
+    [data-theme="dark"] .login-container {
+        background: var(--bg-secondary) !important;
+        box-shadow: 0 2px 8px var(--shadow-heavy) !important;
+    }
+    
+    [data-theme="dark"] .login-container input {
+        background: var(--input-bg) !important;
+        color: var(--text-primary) !important;
+        border-color: var(--input-border) !important;
+    }
+    
+    [data-theme="dark"] .login-container label {
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .login-container h2 {
+        color: var(--text-primary) !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width: 400px; margin: 4rem auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-    <h2 style="margin-bottom: 1.5rem; text-align: center;">ClearCast Login</h2>
+<div class="login-container" style="max-width: 400px; margin: 4rem auto; background: var(--bg-secondary); padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px var(--shadow-medium);">
+    <h2 style="margin-bottom: 1.5rem; text-align: center; color: var(--text-primary);">ClearCast Login</h2>
     
     <form method="post">
         {% csrf_token %}
         <div style="margin-bottom: 1rem;">
-            <label for="username" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Username</label>
+            <label for="username" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Username</label>
             <input type="text" id="username" name="username" required 
-                   style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+                   style="width: 100%; padding: 0.75rem; border: 1px solid var(--input-border); border-radius: 4px; font-size: 1rem; background: var(--input-bg); color: var(--text-primary);">
         </div>
         
         <div style="margin-bottom: 1.5rem;">
-            <label for="password" style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Password</label>
+            <label for="password" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Password</label>
             <input type="password" id="password" name="password" required 
-                   style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+                   style="width: 100%; padding: 0.75rem; border: 1px solid var(--input-border); border-radius: 4px; font-size: 1rem; background: var(--input-bg); color: var(--text-primary);">
         </div>
         
         <div style="text-align: center;">

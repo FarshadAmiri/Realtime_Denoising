@@ -436,6 +436,10 @@ def api_admin_delete_user(request, user_id):
         if user.id == request.user.id:
             return Response({'error': 'Cannot delete yourself'}, status=400)
         
+        # Only superuser can delete admin users
+        if hasattr(user, 'profile') and user.profile.user_level == 'admin' and not request.user.is_superuser:
+            return Response({'error': 'Only superusers can delete admin users'}, status=403)
+        
         username = user.username
         user.delete()
         

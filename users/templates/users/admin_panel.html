@@ -4,6 +4,255 @@
 
 {% block extra_css %}
 <style>
+    /* Dark mode support for admin panel */
+    [data-theme="dark"] .table-controls,
+    [data-theme="dark"] .users-table-container,
+    [data-theme="dark"] .modal-box,
+    [data-theme="dark"] .delete-user-modal {
+        background: var(--bg-secondary) !important;
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .users-table {
+        background: var(--bg-secondary) !important;
+    }
+    
+    [data-theme="dark"] .users-table th {
+        background: #3a3a3a !important;
+        color: var(--text-primary) !important;
+        border-color: #505050 !important;
+    }
+    
+    [data-theme="dark"] .users-table td {
+        background: var(--bg-secondary) !important;
+        color: var(--text-primary) !important;
+        border-color: #505050 !important;
+    }
+    
+    [data-theme="dark"] .users-table tbody tr:hover td {
+        background: #3a3a3a !important;
+    }
+    
+    [data-theme="dark"] .search-input,
+    [data-theme="dark"] .form-input,
+    [data-theme="dark"] .form-select,
+    [data-theme="dark"] .page-size-select {
+        background: var(--input-bg) !important;
+        color: var(--text-primary) !important;
+        border-color: var(--input-border) !important;
+    }
+    
+    [data-theme="dark"] .modal-overlay,
+    [data-theme="dark"] .delete-user-modal-overlay {
+        background: var(--modal-overlay) !important;
+    }
+    
+    [data-theme="dark"] .results-info,
+    [data-theme="dark"] .note,
+    [data-theme="dark"] .muted {
+        color: var(--text-secondary) !important;
+    }
+    
+    [data-theme="dark"] .modal-title,
+    [data-theme="dark"] .delete-user-modal-title {
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .form-label {
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .username-link {
+        color: #60a5fa !important;
+    }
+    
+    [data-theme="dark"] .username-link:hover {
+        color: #93c5fd !important;
+    }
+    
+    /* Table footer - pagination container and controls in dark mode */
+    [data-theme="dark"] .pagination-container {
+        background: var(--bg-secondary) !important;
+        border-color: #505050 !important;
+        box-shadow: 0 4px 12px var(--shadow-heavy) !important;
+    }
+    
+    [data-theme="dark"] .pagination-controls {
+        background: transparent !important;
+    }
+    
+    [data-theme="dark"] .page-size-label,
+    [data-theme="dark"] .pagination-info {
+        color: var(--text-secondary) !important;
+    }
+    
+    [data-theme="dark"] .page-btn {
+        background: #3a3a3a !important;
+        color: var(--text-primary) !important;
+        border-color: #505050 !important;
+    }
+    
+    [data-theme="dark"] .page-btn:hover:not(:disabled) {
+        background: #454545 !important;
+    }
+    
+    [data-theme="dark"] .page-btn:disabled {
+        opacity: 0.4 !important;
+        color: var(--text-muted) !important;
+    }
+    
+    [data-theme="dark"] .page-btn.active {
+        background: #4f46e5 !important;
+        color: white !important;
+    }
+    
+    /* Success and error messages in dark mode */
+    [data-theme="dark"] .success-message {
+        background: rgba(16, 185, 129, 0.15) !important;
+        color: #6ee7b7 !important;
+        border-color: #34d399 !important;
+    }
+    
+    [data-theme="dark"] .error-message {
+        background: rgba(239, 68, 68, 0.15) !important;
+        color: #fca5a5 !important;
+        border-color: #f87171 !important;
+    }
+    
+    /* Modal close button in dark mode */
+    [data-theme="dark"] .modal-close {
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .modal-close:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    /* *** FRIENDS MODAL IN ADMIN PANEL *** */
+    [data-theme="dark"] .friends-modal-box {
+        background: var(--bg-secondary) !important;
+        color: var(--text-primary) !important;
+        box-shadow: 0 20px 60px var(--shadow-heavy) !important;
+    }
+    
+    [data-theme="dark"] .friends-modal-header h2 {
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .friends-modal-close {
+        color: var(--text-secondary) !important;
+    }
+    
+    [data-theme="dark"] .friends-modal-close:hover {
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .search input,
+    [data-theme="dark"] #friends-search-input {
+        background: var(--input-bg) !important;
+        color: var(--text-primary) !important;
+        border-color: var(--input-border) !important;
+    }
+    
+    [data-theme="dark"] .list {
+        background: transparent !important;
+    }
+    
+    [data-theme="dark"] #friends-search-results,
+    [data-theme="dark"] #friends-requests {
+        color: var(--text-primary) !important;
+    }
+    
+    [data-theme="dark"] .list > div {
+        background: #3a3a3a !important;
+        border-color: #505050 !important;
+    }
+    
+    [data-theme="dark"] .list > div:hover {
+        background: #454545 !important;
+    }
+    
+    /* *** USER LEVEL BADGES IN DARK MODE *** */
+    /* Regular - Darker background for better contrast */
+    [data-theme="dark"] .badge-regular {
+        background: #2d2d2d !important;
+        color: #a0a0a0 !important;
+    }
+    
+    /* Admin - More saturated blue */
+    [data-theme="dark"] .badge-admin {
+        background: #1e3a8a !important;
+        color: #93c5fd !important;
+    }
+    
+    /* Superuser - More saturated gold/amber */
+    [data-theme="dark"] .badge-superuser {
+        background: #92400e !important;
+        color: #fbbf24 !important;
+    }
+    
+    /* Stream access badges */
+    [data-theme="dark"] .badge-yes {
+        background: #065f46 !important;
+        color: #6ee7b7 !important;
+    }
+    
+    [data-theme="dark"] .badge-no {
+        background: #7f1d1d !important;
+        color: #fca5a5 !important;
+    }
+    
+    /* *** TABLE HEAD - DARK BLUE IN DARK MODE *** */
+    [data-theme="dark"] .users-table th {
+        background: #1e3a8a !important;
+        color: #e0e7ff !important;
+        border-color: #1e40af !important;
+    }
+    
+    /* *** CHECKBOX LABEL IN DARK MODE *** */
+    [data-theme="dark"] .checkbox-label {
+        color: #e0e0e0 !important;
+    }
+    
+    /* *** CANCEL BUTTON IN DARK MODE *** */
+    [data-theme="dark"] .btn-cancel {
+        background: #4b5563 !important;
+        color: #e5e7eb !important;
+    }
+    
+    [data-theme="dark"] .btn-cancel:hover {
+        background: #6b7280 !important;
+    }
+    
+    /* *** DELETE USER MODAL ELEMENTS IN DARK MODE *** */
+    [data-theme="dark"] .delete-user-modal-body {
+        color: #d1d5db !important;
+    }
+    
+    [data-theme="dark"] .delete-user-modal-username {
+        background: rgba(239, 68, 68, 0.2) !important;
+        color: #fca5a5 !important;
+    }
+    
+    [data-theme="dark"] .delete-user-modal-warning {
+        background: rgba(251, 191, 36, 0.15) !important;
+        color: #fbbf24 !important;
+    }
+    
+    /* *** SUCCESS MODAL IN DARK MODE *** */
+    [data-theme="dark"] .success-modal-box {
+        background: #2d2d2d !important;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7) !important;
+    }
+    
+    [data-theme="dark"] .success-modal-title {
+        color: #34d399 !important;
+    }
+    
+    [data-theme="dark"] .success-modal-message {
+        color: #d1d5db !important;
+    }
+    
     .admin-container {
         max-width: 1400px;
         margin: 0 auto;
@@ -323,6 +572,30 @@
         color: white;
     }
     
+    .btn-delete-user {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-delete-user:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        filter: brightness(1.05);
+    }
+    
+    .btn-delete-user:active {
+        transform: translateY(0);
+    }
+    
     .btn-modal:hover {
         filter: brightness(0.95);
     }
@@ -349,6 +622,131 @@
         border-radius: 8px;
         margin-bottom: 1rem;
         font-size: 0.875rem;
+    }
+    
+    /* Delete User Confirmation Modal */
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
+    .delete-user-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+        animation: fadeIn 0.2s ease;
+    }
+    
+    .delete-user-modal {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 450px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: slideUp 0.3s ease;
+    }
+    
+    .delete-user-modal-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    
+    .delete-user-modal-icon {
+        font-size: 2.5rem;
+    }
+    
+    .delete-user-modal-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #111827;
+        margin: 0;
+    }
+    
+    .delete-user-modal-body {
+        color: #6b7280;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+        font-size: 0.95rem;
+    }
+    
+    .delete-user-modal-username {
+        font-weight: 700;
+        color: #ef4444;
+        font-size: 1.05rem;
+        padding: 0.5rem 0.75rem;
+        background: #fee2e2;
+        border-radius: 6px;
+        display: inline-block;
+        margin: 0.5rem 0;
+    }
+    
+    .delete-user-modal-warning {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-top: 1rem;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        line-height: 1.5;
+    }
+    
+    .delete-user-modal-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+    }
+    
+    .delete-user-modal-btn {
+        padding: 0.7rem 1.5rem;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    
+    .delete-user-modal-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .delete-user-modal-btn:active {
+        transform: translateY(0);
+    }
+    
+    .delete-user-modal-btn.cancel {
+        background: #f3f4f6;
+        color: #374151;
+    }
+    
+    .delete-user-modal-btn.delete {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
     }
     
     .loading {
@@ -616,6 +1014,28 @@
     </div>
 </div>
 
+<!-- Delete User Confirmation Modal -->
+<div id="delete-user-modal-overlay" class="delete-user-modal-overlay" style="display: none;">
+    <div class="delete-user-modal">
+        <div class="delete-user-modal-header">
+            <span class="delete-user-modal-icon">⚠️</span>
+            <h3 class="delete-user-modal-title">Delete User?</h3>
+        </div>
+        <div class="delete-user-modal-body">
+            Are you sure you want to permanently delete the user:
+            <div class="delete-user-modal-username" id="delete-user-name"></div>
+            <div class="delete-user-modal-warning">
+                <span>⚠️</span>
+                <span>This action cannot be undone. All user data, recordings, and associated information will be permanently removed.</span>
+            </div>
+        </div>
+        <div class="delete-user-modal-actions">
+            <button class="delete-user-modal-btn cancel" onclick="closeDeleteUserModal()">Cancel</button>
+            <button class="delete-user-modal-btn delete" onclick="confirmDeleteUser()">Delete User</button>
+        </div>
+    </div>
+</div>
+
 <!-- Create User Modal -->
 <div id="create-modal" class="modal-overlay" onclick="if(event.target === this) closeCreateModal()">
     <div class="modal-box">
@@ -724,6 +1144,11 @@
             </div>
             
             <div class="modal-actions">
+                <button type="button" class="btn-modal btn-delete-user" id="btn-delete-user" onclick="showDeleteUserModal()">
+                    <span>🗑️</span>
+                    <span>Delete User</span>
+                </button>
+                <div style="flex: 1;"></div>
                 <button type="button" class="btn-modal btn-cancel" onclick="closeEditModal()">Cancel</button>
                 <button type="submit" class="btn-modal btn-save">Save Changes</button>
             </div>
@@ -1087,6 +1512,20 @@ function openEditModal(userId) {
         document.getElementById('edit-allow-stream').disabled = false;
     }
     
+    // Hide delete button if editing yourself or if admin trying to delete another admin (only superuser can)
+    const deleteBtn = document.getElementById('btn-delete-user');
+    const isSuperuser = {{ request.user.is_superuser|lower }};
+    
+    if (user.username === '{{ request.user.username }}') {
+        // Can't delete yourself
+        deleteBtn.style.display = 'none';
+    } else if (user.user_level === 'admin' && !isSuperuser) {
+        // Only superuser can delete admin users
+        deleteBtn.style.display = 'none';
+    } else {
+        deleteBtn.style.display = 'inline-flex';
+    }
+    
     document.getElementById('edit-modal').classList.add('active');
 }
 
@@ -1146,6 +1585,64 @@ function showSuccessModal(title, message) {
     document.getElementById('success-modal-message').textContent = message;
     document.getElementById('success-modal').classList.add('active');
 }
+
+// Delete User Functions
+let currentDeleteUserId = null;
+
+function showDeleteUserModal() {
+    const userId = document.getElementById('edit-user-id').value;
+    const username = document.getElementById('edit-username').value;
+    
+    currentDeleteUserId = userId;
+    document.getElementById('delete-user-name').textContent = username;
+    document.getElementById('delete-user-modal-overlay').style.display = 'flex';
+}
+
+function closeDeleteUserModal() {
+    currentDeleteUserId = null;
+    document.getElementById('delete-user-modal-overlay').style.display = 'none';
+}
+
+async function confirmDeleteUser() {
+    if (!currentDeleteUserId) return;
+    
+    const userId = currentDeleteUserId;
+    const username = document.getElementById('edit-username').value;
+    
+    try {
+        const response = await fetch(`/api/admin/users/${userId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin'
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to delete user');
+        }
+        
+        closeDeleteUserModal();
+        closeEditModal();
+        loadUsers();
+        showSuccessModal('User Deleted!', `User "${username}" has been permanently deleted.`);
+    } catch (error) {
+        closeDeleteUserModal();
+        document.getElementById('edit-error').textContent = error.message;
+        document.getElementById('edit-error').style.display = 'block';
+    }
+}
+
+// Click outside to close delete modal
+document.addEventListener('click', (event) => {
+    const overlay = document.getElementById('delete-user-modal-overlay');
+    if (event.target === overlay) {
+        closeDeleteUserModal();
+    }
+});
 
 function closeSuccessModal() {
     document.getElementById('success-modal').classList.remove('active');
