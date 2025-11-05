@@ -89,13 +89,26 @@
             <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding: .75rem 1rem; border:1px solid #eef2f7; border-radius:12px; background:linear-gradient(180deg,#ffffff,#fafafa)">
                 <div style="display:flex; align-items:center; gap:.75rem; flex-wrap:wrap">
                     <button id="start-btn" class="cta" onclick="startStream()">▶ Stream</button>
-                    <button id="stop-btn" class="cta stop" onclick="stopStream()" style="display:none">■ Stop</button>
+                    <button id="stop-btn" class="cta stop" onclick="stopStream()" style="display:none">
+                        <span style="display:flex; align-items:center; gap:.5rem">
+                            <span style="font-size:1.1em">■</span>
+                            <span>Stop</span>
+                            <span id="stop-timer" style="font-weight:700; font-family:monospace; letter-spacing:0.5px; padding-left:.25rem; border-left:1px solid rgba(255,255,255,0.3)">00:00</span>
+                        </span>
+                    </button>
                     <!-- Hidden checkbox preserved for logic; visible toggle is a button -->
                     <input type="checkbox" id="denoise-toggle" checked style="display:none">
                     <button id="denoise-btn" type="button" class="toggle-pill toggle-on" onclick="toggleDenoise()" title="Toggle denoise before starting stream">Denoise: ON</button>
-                </div>
-                <div style="display:flex; align-items:center; gap:.5rem">
-                    <span class="timer" id="timer" style="background:#737276; font-size: 17px;color:#fff; padding:.35rem .6rem; border-radius:8px; min-width:64px; text-align:center">00:00</span>
+                    <!-- Denoise status label (shown during streaming) -->
+                    <span id="denoise-status" style="display:none; padding:.35rem .65rem; border-radius:8px; font-size:0.85rem; font-weight:600; background:#10b981; color:#fff;">
+                        ✓ Denoise: ON
+                    </span>
+                    <!-- Sound wave animation (hidden by default, shown when streaming) -->
+                    <div class="sound-wave" id="sound-wave" style="display:none">
+                        {% for i in "x"|rjust:45 %}
+                        <span class="bar"></span>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
             <div id="stream-status" class="muted" style="margin:.5rem 0 1rem"></div>
@@ -229,5 +242,10 @@
 
 {% block extra_js %}
 <script id="cfg" type="application/json">{"browserAudioProcessing": {{ browser_audio_processing|yesno:"true,false" }}}</script>
+<script>
+// Pass Django template variables to JavaScript
+window.CURRENT_USER = "{{ user.username }}";
+window.USER_ID = {{ user.id }};
+</script>
 <script src="{% static 'js/main.js' %}"></script>
 {% endblock %}
