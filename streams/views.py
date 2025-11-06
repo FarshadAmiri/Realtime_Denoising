@@ -41,6 +41,7 @@ def page_broadcaster(request):
         outgoing_ids = list(
             Friendship.objects.filter(from_user=user, status='accepted').values_list('to_user_id', flat=True)
         )
+
         incoming_ids = list(
             Friendship.objects.filter(to_user=user, status='accepted').values_list('from_user_id', flat=True)
         )

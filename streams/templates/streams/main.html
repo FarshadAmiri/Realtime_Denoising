@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
+<link rel="stylesheet" href="{% static 'css/modal-tabs.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -181,42 +182,102 @@
     </div>
 </div>
 
-<!-- Denoise File Modal -->
+<!-- Audio Processing Modal (Denoise, Vocal Separation, Audio Boost) -->
 <div id="denoise-modal" class="modal-overlay" onclick="if(event.target === this) closeDenoiseModal()">
     <div class="friends-modal-box" style="max-width: 700px;">
         <div class="friends-modal-header">
-            <h2 style="margin: 0;">Denoise Audio File</h2>
+            <h2 style="margin: 0;">Audio Processing</h2>
             <button class="friends-modal-close" onclick="closeDenoiseModal()">&times;</button>
         </div>
         <div class="divider" style="margin: 0.5rem 0 1rem;"></div>
         
-        <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Upload Your Audio File</h3>
-        <form id="upload-form" enctype="multipart/form-data" style="margin-bottom: 1.5rem;">
-            <div style="display: flex; gap: 0.75rem; align-items: stretch;">
-                <div class="file-input-wrapper" id="file-input-wrapper">
-                    <label for="audio-file-input" class="file-input-label">
-                        <span class="file-input-icon">📁</span>
-                        <div class="file-input-text">
-                            <div class="file-input-main" id="file-input-main">Choose an audio file</div>
-                            <div class="file-input-sub" id="file-input-sub">WAV, MP3, FLAC, OGG, M4A</div>
-                        </div>
-                        <button type="button" class="file-input-clear" id="file-input-clear" style="display: none;" onclick="clearFileInput(event)">✕</button>
-                    </label>
-                    <input type="file" id="audio-file-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
+        <!-- Tabs -->
+        <div class="modal-tabs">
+            <button class="modal-tab active" data-tab="denoise" onclick="switchModalTab('denoise')">
+                <span>✨</span>
+                <span>File Denoise</span>
+            </button>
+            <button class="modal-tab" data-tab="vocal" onclick="switchModalTab('vocal')">
+                <span>🎤</span>
+                <span>Vocal Separation</span>
+            </button>
+            <button class="modal-tab" data-tab="boost" onclick="switchModalTab('boost')">
+                <span>🔊</span>
+                <span>Audio Boost</span>
+            </button>
+        </div>
+        
+        <!-- Tab Content: File Denoise -->
+        <div class="modal-tab-content active" id="denoise-tab-content">
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Upload Your Audio File</h3>
+            <form id="upload-form" enctype="multipart/form-data" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; gap: 0.75rem; align-items: stretch;">
+                    <div class="file-input-wrapper" id="file-input-wrapper">
+                        <label for="audio-file-input" class="file-input-label">
+                            <span class="file-input-icon">📁</span>
+                            <div class="file-input-text">
+                                <div class="file-input-main" id="file-input-main">Choose an audio file</div>
+                                <div class="file-input-sub" id="file-input-sub">WAV, MP3, FLAC, OGG, M4A</div>
+                            </div>
+                            <button type="button" class="file-input-clear" id="file-input-clear" style="display: none;" onclick="clearFileInput(event)">✕</button>
+                        </label>
+                        <input type="file" id="audio-file-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
+                    </div>
+                    <button type="submit" class="btn-upload-denoise">
+                        <span>✨</span>
+                        <span>Upload & Denoise</span>
+                    </button>
                 </div>
-                <button type="submit" class="btn-upload-denoise">
-                    <span>✨</span>
-                    <span>Upload & Denoise</span>
-                </button>
+                <div id="upload-status" class="muted" style="margin-top: 0.5rem;"></div>
+            </form>
+            
+            <div class="divider"></div>
+            
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Files</h3>
+            <div id="denoise-files-list" style="max-height: 400px; overflow-y: auto;">
+                <div class="empty">No files yet</div>
             </div>
-            <div id="upload-status" class="muted" style="margin-top: 0.5rem;"></div>
-        </form>
+        </div>
         
-        <div class="divider"></div>
+        <!-- Tab Content: Vocal Separation -->
+        <div class="modal-tab-content" id="vocal-tab-content">
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Upload Audio for Vocal Separation</h3>
+            <form id="vocal-upload-form" enctype="multipart/form-data" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; gap: 0.75rem; align-items: stretch;">
+                    <div class="file-input-wrapper" id="vocal-file-input-wrapper">
+                        <label for="vocal-file-input" class="file-input-label">
+                            <span class="file-input-icon">📁</span>
+                            <div class="file-input-text">
+                                <div class="file-input-main" id="vocal-file-input-main">Choose an audio file</div>
+                                <div class="file-input-sub" id="vocal-file-input-sub">WAV, MP3, FLAC, OGG, M4A</div>
+                            </div>
+                            <button type="button" class="file-input-clear" id="vocal-file-input-clear" style="display: none;" onclick="clearVocalFileInput(event)">✕</button>
+                        </label>
+                        <input type="file" id="vocal-file-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
+                    </div>
+                    <button type="submit" class="btn-upload-denoise">
+                        <span>🎤</span>
+                        <span>Separate Vocals</span>
+                    </button>
+                </div>
+                <div id="vocal-upload-status" class="muted" style="margin-top: 0.5rem;"></div>
+            </form>
+            
+            <div class="divider"></div>
+            
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Separated Files</h3>
+            <div id="vocal-files-list" style="max-height: 400px; overflow-y: auto;">
+                <div class="empty">No files yet</div>
+            </div>
+        </div>
         
-        <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Files</h3>
-        <div id="denoise-files-list" style="max-height: 400px; overflow-y: auto;">
-            <div class="empty">No files yet</div>
+        <!-- Tab Content: Audio Boost -->
+        <div class="modal-tab-content" id="boost-tab-content">
+            <div style="text-align: center; padding: 3rem 1rem; color: var(--text-secondary);">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🔊</div>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--text-primary);">Audio Boost</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted);">Coming soon...</p>
+            </div>
         </div>
     </div>
 </div>
@@ -248,4 +309,5 @@ window.CURRENT_USER = "{{ user.username }}";
 window.USER_ID = {{ user.id }};
 </script>
 <script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/modal-tabs.js' %}"></script>
 {% endblock %}

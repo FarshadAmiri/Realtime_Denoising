@@ -60,3 +60,29 @@ class UploadedAudioFile(models.Model):
         minutes = int(self.duration // 60)
         seconds = int(self.duration % 60)
         return f"{minutes:02d}:{seconds:02d}"
+
+
+class VocalSeparationFile(models.Model):
+    """Stores user-uploaded audio files for vocal separation using Demucs."""
+    PROCESSING_STATUS = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('error', 'Error'),
+    ]
+    
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vocal_separation_files')
+    original_filename = models.CharField(max_length=255)
+    original_file = models.FileField(upload_to='uploads/vocal_separation/original/')
+    vocals_file = models.FileField(upload_to='uploads/vocal_separation/vocals/', null=True, blank=True)
+    instrumental_file = models.FileField(upload_to='uploads/vocal_separation/instrumental/', null=True, blank=True)
+    status = models.CharField(max_length=20, choices=PROCESSING_STATUS, default='pending')
+    error_message = models.TextField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-uploaded_at']
+    
+    def __str__(self):
+        return f"{self.owner.username} - {self.original_filename} ({self.status})"

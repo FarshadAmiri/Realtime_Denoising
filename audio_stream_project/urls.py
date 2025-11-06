@@ -8,6 +8,7 @@ from django.conf.urls.static import static
 
 from users import views as user_views
 from streams import views as stream_views
+from streams import vocal_separation as vocal_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -57,6 +58,12 @@ urlpatterns = [
     path('api/denoise/files/', stream_views.list_uploaded_files, name='list_uploaded_files'),
     path('api/denoise/files/<int:file_id>/status/', stream_views.get_file_status, name='get_file_status'),
     path('api/denoise/files/<int:file_id>/delete/', stream_views.delete_uploaded_file, name='delete_uploaded_file'),
+    
+    # Vocal separation
+    path('api/vocal/separate/', vocal_views.upload_vocal_file, name='upload_vocal_file'),
+    path('api/vocal/files/', vocal_views.list_vocal_files, name='list_vocal_files'),
+    path('api/vocal/files/<int:file_id>/status/', vocal_views.get_vocal_file_status, name='get_vocal_file_status'),
+    path('api/vocal/files/<int:file_id>/delete/', vocal_views.delete_vocal_file, name='delete_vocal_file'),
 ]
 
 # Serve media files in development
