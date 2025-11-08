@@ -182,7 +182,7 @@
     </div>
 </div>
 
-<!-- Audio Processing Modal (Denoise, Vocal Separation, Audio Boost) -->
+<!-- Audio Processing Modal (Denoise, Vocal Separation, Volume Boost) -->
 <div id="denoise-modal" class="modal-overlay" onclick="if(event.target === this) closeDenoiseModal()">
     <div class="friends-modal-box" style="max-width: 700px;">
         <div class="friends-modal-header">
@@ -203,7 +203,7 @@
             </button>
             <button class="modal-tab" data-tab="boost" onclick="switchModalTab('boost')">
                 <span>🔊</span>
-                <span>Audio Boost</span>
+                <span>Volume Boost</span>
             </button>
         </div>
         
@@ -211,9 +211,9 @@
         <div class="modal-tab-content active" id="denoise-tab-content">
             <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Upload Your Audio File</h3>
             <form id="upload-form" enctype="multipart/form-data" style="margin-bottom: 1.5rem;">
-                <div style="display: flex; gap: 0.75rem; align-items: stretch;">
-                    <div class="file-input-wrapper" id="file-input-wrapper">
-                        <label for="audio-file-input" class="file-input-label">
+                <div style="display: flex; gap: 0.75rem; align-items: stretch; flex-wrap: wrap;">
+                    <div class="file-input-wrapper" id="file-input-wrapper" style="flex: 1; min-width: 200px; height: 56px;">
+                        <label for="audio-file-input" class="file-input-label" style="height: 100%;">
                             <span class="file-input-icon">📁</span>
                             <div class="file-input-text">
                                 <div class="file-input-main" id="file-input-main">Choose an audio file</div>
@@ -223,9 +223,18 @@
                         </label>
                         <input type="file" id="audio-file-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
                     </div>
-                    <button type="submit" class="btn-upload-denoise">
+                    <div class="volume-boost-controls" style="height: 56px;">
+                        <div class="boost-header">
+                            <span class="boost-label" id="boost-label-toggle" onclick="toggleDenoiseBoost()">🔊 Volume Boost</span>
+                        </div>
+                        <div class="boost-slider-container">
+                            <input type="range" id="denoise-boost-level" class="boost-slider" min="2" max="5" value="3" step="1" disabled oninput="updateBoostLabel()">
+                            <span id="denoise-boost-value" class="boost-value">3x</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-upload-denoise" style="height: 56px; padding: 0.75rem 1.5rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); white-space: nowrap;">
                         <span>✨</span>
-                        <span>Upload & Denoise</span>
+                        <span>Denoise</span> 
                     </button>
                 </div>
                 <div id="upload-status" class="muted" style="margin-top: 0.5rem;"></div>
@@ -234,7 +243,7 @@
             <div class="divider"></div>
             
             <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Files</h3>
-            <div id="denoise-files-list" style="max-height: 400px; overflow-y: auto;">
+            <div id="denoise-files-list" style="max-height: 300px; overflow-y: auto;">
                 <div class="empty">No files yet</div>
             </div>
         </div>
@@ -266,17 +275,46 @@
             <div class="divider"></div>
             
             <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Separated Files</h3>
-            <div id="vocal-files-list" style="max-height: 400px; overflow-y: auto;">
+            <div id="vocal-files-list" style="max-height: 300px; overflow-y: auto;">
                 <div class="empty">No files yet</div>
             </div>
         </div>
         
-        <!-- Tab Content: Audio Boost -->
+        <!-- Tab Content: Volume Boost -->
         <div class="modal-tab-content" id="boost-tab-content">
-            <div style="text-align: center; padding: 3rem 1rem; color: var(--text-secondary);">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">🔊</div>
-                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--text-primary);">Audio Boost</h3>
-                <p style="font-size: 0.9rem; color: var(--text-muted);">Coming soon...</p>
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Upload Audio for Volume Boost</h3>
+            <form id="boost-upload-form" enctype="multipart/form-data" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; gap: 0.75rem; align-items: stretch;">
+                    <div class="file-input-wrapper" id="boost-file-input-wrapper">
+                        <label for="boost-file-input" class="file-input-label">
+                            <span class="file-input-icon">📁</span>
+                            <div class="file-input-text">
+                                <div class="file-input-main" id="boost-file-input-main">Choose an audio file</div>
+                                <div class="file-input-sub" id="boost-file-input-sub">WAV, MP3, FLAC, OGG, M4A</div>
+                            </div>
+                            <button type="button" class="file-input-clear" id="boost-file-input-clear" style="display: none;" onclick="clearBoostFileInput(event)">✕</button>
+                        </label>
+                        <input type="file" id="boost-file-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
+                    </div>
+                    <select id="boost-level" style="padding: 0.75rem 1rem; border: 2px solid #d1d5db; border-radius: 12px; font-size: 0.95rem; background: white; cursor: pointer; outline: none; transition: all 0.2s;">
+                        <option value="gentle">🔉 2x Volume</option>
+                        <option value="medium" selected>🔊 3x Volume</option>
+                        <option value="strong">📢 4x Volume</option>
+                        <option value="max">🚀 5x Volume</option>
+                    </select>
+                    <button type="submit" class="btn-upload-denoise">
+                        <span>🔊</span>
+                        <span>Boost Volume</span>
+                    </button>
+                </div>
+                <div id="boost-upload-status" class="muted" style="margin-top: 0.5rem;"></div>
+            </form>
+            
+            <div class="divider"></div>
+            
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Boosted Files</h3>
+            <div id="boost-files-list" style="max-height: 300px; overflow-y: auto;">
+                <div class="empty">No files yet</div>
             </div>
         </div>
     </div>

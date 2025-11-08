@@ -410,6 +410,11 @@ def upload_audio_file(request):
         return Response({'error': 'No file provided'}, status=400)
     
     uploaded_file = request.FILES['file']
+    boost_level = request.data.get('boost_level', 'none')
+    
+    # Validate boost level
+    if boost_level not in ['none', '2x', '3x', '4x', '5x']:
+        boost_level = 'none'
     
     # Validate file type
     allowed_extensions = ['.wav', '.mp3', '.flac', '.ogg', '.m4a']
@@ -422,6 +427,7 @@ def upload_audio_file(request):
         owner=request.user,
         original_filename=uploaded_file.name,
         original_file=uploaded_file,
+        boost_level=boost_level,
         status='pending'
     )
     
@@ -452,6 +458,7 @@ def list_uploaded_files(request):
             'original_file_url': f.original_file.url if f.original_file else None,
             'denoised_file_url': f.denoised_file.url if f.denoised_file else None,
             'status': f.status,
+            'boost_level': f.boost_level,
             'error_message': f.error_message,
             'duration': f.duration,
             'uploaded_at': f.uploaded_at.isoformat(),
@@ -514,6 +521,7 @@ def delete_uploaded_file(request, file_id):
 def process_audio_file(file_id):
     """Background task to denoise an audio file."""
     import os
+    import subprocess
     import tempfile
     from pathlib import Path
     import soundfile as sf
@@ -560,7 +568,7 @@ def process_audio_file(file_id):
         sf.write(temp_wav_input.name, data, sr)
         temp_wav_input.close()
         
-        # Denoise using dfn2.py
+        # Denoise using selected model
         temp_output = tempfile.NamedTemporaryFile(delete=False, suffix='_denoised.wav')
         temp_output.close()
         
@@ -568,7 +576,42 @@ def process_audio_file(file_id):
         import dfn2
         dfn2.denoise_file(temp_wav_input.name, temp_output.name)
         
-        # Save denoised file to model
+        # Apply volume boost if requested
+        if audio_file.boost_level != 'none':
+            print(f"Applying {audio_file.boost_level} volume boost after denoising...")
+            temp_boosted = tempfile.NamedTemporaryFile(delete=False, suffix='_boosted.wav')
+            temp_boosted.close()
+            
+            # Map boost levels to multipliers
+            boost_multipliers = {
+                '2x': 2.0,
+                '3x': 3.0,
+                '4x': 4.0,
+                '5x': 5.0,
+            }
+            multiplier = boost_multipliers.get(audio_file.boost_level, 1.0)
+            
+            # Apply volume boost using FFmpeg
+            boost_cmd = [
+                'ffmpeg',
+                '-i', temp_output.name,
+                '-af', f'volume={multiplier}',
+                '-y',
+                temp_boosted.name
+            ]
+            
+            subprocess.run(
+                boost_cmd,
+                check=True,
+                capture_output=True,
+                timeout=300
+            )
+            
+            # Use boosted file as final output
+            os.unlink(temp_output.name)
+            temp_output.name = temp_boosted.name
+        
+        # Save denoised (and optionally boosted) file to model
         denoised_filename = f"denoised_{audio_file.original_filename}"
         if not denoised_filename.lower().endswith('.wav'):
             denoised_filename = os.path.splitext(denoised_filename)[0] + '.wav'

@@ -9,6 +9,7 @@ from django.conf.urls.static import static
 from users import views as user_views
 from streams import views as stream_views
 from streams import vocal_separation as vocal_views
+from streams import audio_boost as boost_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -64,6 +65,12 @@ urlpatterns = [
     path('api/vocal/files/', vocal_views.list_vocal_files, name='list_vocal_files'),
     path('api/vocal/files/<int:file_id>/status/', vocal_views.get_vocal_file_status, name='get_vocal_file_status'),
     path('api/vocal/files/<int:file_id>/delete/', vocal_views.delete_vocal_file, name='delete_vocal_file'),
+    
+    # Audio boost
+    path('api/boost/upload/', boost_views.upload_boost_file, name='upload_boost_file'),
+    path('api/boost/files/', boost_views.list_boost_files, name='list_boost_files'),
+    path('api/boost/files/<int:file_id>/status/', boost_views.get_boost_file_status, name='get_boost_file_status'),
+    path('api/boost/files/<int:file_id>/delete/', boost_views.delete_boost_file, name='delete_boost_file'),
 ]
 
 # Serve media files in development
