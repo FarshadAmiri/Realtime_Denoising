@@ -223,12 +223,12 @@
                         </label>
                         <input type="file" id="audio-file-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
                     </div>
-                    <div class="volume-boost-controls" style="height: 56px;">
+                    <div class="volume-boost-controls" style="height: 56px;" id="volume-boost-container" onclick="handleBoostContainerClick(event)">
                         <div class="boost-header">
-                            <span class="boost-label" id="boost-label-toggle" onclick="toggleDenoiseBoost()">🔊 Volume Boost</span>
+                            <span class="boost-label" id="boost-label-toggle">🔊 Volume Boost</span>
                         </div>
                         <div class="boost-slider-container">
-                            <input type="range" id="denoise-boost-level" class="boost-slider" min="2" max="5" value="3" step="1" disabled oninput="updateBoostLabel()">
+                            <input type="range" id="denoise-boost-level" class="boost-slider" min="2" max="5" value="3" step="1" disabled oninput="updateBoostLabel()" onclick="event.stopPropagation()">
                             <span id="denoise-boost-value" class="boost-value">3x</span>
                         </div>
                     </div>
