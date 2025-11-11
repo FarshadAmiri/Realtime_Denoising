@@ -640,3 +640,109 @@ def process_audio_file(file_id):
             audio_file.save()
         except Exception:
             pass
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_speaker_extraction(request):
+    """Upload audio files for speaker extraction."""
+    if 'conversation_file' not in request.FILES or 'target_file' not in request.FILES:
+        return Response({'error': 'Both conversation and target speaker files are required'}, status=400)
+    
+    conversation_file = request.FILES['conversation_file']
+    target_file = request.FILES['target_file']
+    boost_level = request.data.get('boost_level', 'none')
+    
+    # Validate boost level
+    if boost_level not in ['none', '2x', '3x', '4x', '5x']:
+        boost_level = 'none'
+    
+    # Validate file types
+    allowed_extensions = ['.wav', '.mp3', '.flac', '.ogg', '.m4a']
+    if not any(conversation_file.name.lower().endswith(ext) for ext in allowed_extensions):
+        return Response({'error': 'Invalid conversation file type'}, status=400)
+    if not any(target_file.name.lower().endswith(ext) for ext in allowed_extensions):
+        return Response({'error': 'Invalid target file type'}, status=400)
+    
+    from .models import SpeakerExtractionFile
+    
+    # Create database entry
+    extraction_file = SpeakerExtractionFile.objects.create(
+        owner=request.user,
+        original_filename=conversation_file.name,
+        target_speaker_filename=target_file.name,
+        conversation_file=conversation_file,
+        target_speaker_file=target_file,
+        boost_level=boost_level,
+        status='pending'
+    )
+    
+    # Start processing in background thread
+    import threading
+    from .speaker_extraction_processor import process_speaker_extraction
+    
+    thread = threading.Thread(target=process_speaker_extraction, args=(extraction_file.id,))
+    thread.daemon = True
+    thread.start()
+    
+    return Response({
+        'id': extraction_file.id,
+        'conversation_filename': extraction_file.original_filename,
+        'target_filename': extraction_file.target_speaker_filename,
+        'status': extraction_file.status,
+        'uploaded_at': extraction_file.uploaded_at.isoformat()
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_speaker_extraction_files(request):
+    """Get list of speaker extraction files for the current user."""
+    from .models import SpeakerExtractionFile
+    
+    files = SpeakerExtractionFile.objects.filter(owner=request.user)
+    
+    data = []
+    for f in files:
+        data.append({
+            'id': f.id,
+            'conversation_filename': f.original_filename,
+            'target_filename': f.target_speaker_filename,
+            'conversation_url': f.conversation_file.url if f.conversation_file else None,
+            'target_url': f.target_speaker_file.url if f.target_speaker_file else None,
+            'extracted_url': f.extracted_file.url if f.extracted_file else None,
+            'status': f.status,
+            'similarity_score': f.similarity_score,
+            'boost_level': f.boost_level,
+            'error_message': f.error_message,
+            'uploaded_at': f.uploaded_at.isoformat(),
+            'processed_at': f.processed_at.isoformat() if f.processed_at else None,
+        })
+    
+    return Response({'files': data})
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_speaker_extraction_file(request, file_id):
+    """Delete a speaker extraction file and its associated files from storage."""
+    from .models import SpeakerExtractionFile
+    
+    try:
+        extraction_file = SpeakerExtractionFile.objects.get(id=file_id, owner=request.user)
+    except SpeakerExtractionFile.DoesNotExist:
+        return Response({'error': 'File not found'}, status=404)
+    
+    # Delete physical files from storage
+    for field in ['conversation_file', 'target_speaker_file', 'extracted_file']:
+        try:
+            file_field = getattr(extraction_file, field)
+            if file_field and file_field.storage.exists(file_field.name):
+                file_field.delete(save=False)
+        except Exception as e:
+            print(f"Error deleting {field}: {e}")
+    
+    # Delete database record
+    extraction_file.delete()
+    
+    return Response({'message': 'File deleted successfully'}, status=200)

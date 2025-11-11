@@ -71,6 +71,11 @@ urlpatterns = [
     path('api/boost/files/', boost_views.list_boost_files, name='list_boost_files'),
     path('api/boost/files/<int:file_id>/status/', boost_views.get_boost_file_status, name='get_boost_file_status'),
     path('api/boost/files/<int:file_id>/delete/', boost_views.delete_boost_file, name='delete_boost_file'),
+    
+    # Speaker extraction
+    path('api/speaker/extract/', stream_views.upload_speaker_extraction, name='upload_speaker_extraction'),
+    path('api/speaker/files/', stream_views.list_speaker_extraction_files, name='list_speaker_extraction_files'),
+    path('api/speaker/files/<int:file_id>/delete/', stream_views.delete_speaker_extraction_file, name='delete_speaker_extraction_file'),
 ]
 
 # Serve media files in development

@@ -4,7 +4,7 @@
 {% block title %}Home | ClearCast{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/main.css' %}">
+<link rel="stylesheet" href="{% static 'css/main.css' %}?v=2024111103">
 <link rel="stylesheet" href="{% static 'css/modal-tabs.css' %}">
 {% endblock %}
 
@@ -205,6 +205,10 @@
                 <span>🔊</span>
                 <span>Volume Boost</span>
             </button>
+            <button class="modal-tab" data-tab="speaker" onclick="switchModalTab('speaker')">
+                <span>🎯</span>
+                <span>Voice Extraction</span>
+            </button>
         </div>
         
         <!-- Tab Content: File Denoise -->
@@ -317,6 +321,68 @@
             
             <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Boosted Files</h3>
             <div id="boost-files-list" style="max-height: 300px; overflow-y: auto;">
+                <div class="empty">No files yet</div>
+            </div>
+        </div>
+        
+        <!-- Tab Content: Voice Extraction -->
+        <div class="modal-tab-content" id="speaker-tab-content">
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Extract Target Speaker's Voice</h3>
+            <form id="speaker-upload-form" enctype="multipart/form-data" style="margin-bottom: 1.5rem;">
+                <!-- First Row: File Inputs + Volume Boost -->
+                <div style="display: flex; gap: 0.75rem; align-items: stretch; margin-bottom: 0.75rem;">
+                    <!-- Conversation File -->
+                    <div class="file-input-wrapper" id="speaker-conversation-input-wrapper" style="flex: 1; min-width: 200px; height: 56px;">
+                        <label for="speaker-conversation-input" class="file-input-label" style="height: 100%;">
+                            <div class="file-input-text">
+                                <div class="file-input-main" id="speaker-conversation-main">Conversation audio</div>
+                                <div class="file-input-sub" id="speaker-conversation-sub">Multi-speaker recording</div>
+                            </div>
+                            <button type="button" class="file-input-clear" id="speaker-conversation-clear" style="display: none;" onclick="clearSpeakerConversationInput(event)">✕</button>
+                        </label>
+                        <input type="file" id="speaker-conversation-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
+                    </div>
+                    
+                    <!-- Target Speaker File -->
+                    <div class="file-input-wrapper" id="speaker-target-input-wrapper" style="flex: 1; min-width: 200px; height: 56px;">
+                        <label for="speaker-target-input" class="file-input-label" style="height: 100%;">
+                            <div class="file-input-text">
+                                <div class="file-input-main" id="speaker-target-main">Target speaker sample</div>
+                                <div class="file-input-sub" id="speaker-target-sub">Voice sample to extract</div>
+                            </div>
+                            <button type="button" class="file-input-clear" id="speaker-target-clear" style="display: none;" onclick="clearSpeakerTargetInput(event)">✕</button>
+                        </label>
+                        <input type="file" id="speaker-target-input" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a" />
+                    </div>
+                    
+                    <!-- Volume Boost Controls -->
+                    <div class="volume-boost-controls" style="height: 56px;" id="speaker-volume-boost-container" onclick="handleSpeakerBoostContainerClick(event)">
+                        <div class="boost-header">
+                            <span class="boost-label" id="speaker-boost-label-toggle">🔊 Volume Boost</span>
+                        </div>
+                        <div class="boost-slider-container">
+                            <input type="range" id="speaker-boost-level" class="boost-slider" min="2" max="5" value="3" step="1" disabled oninput="updateSpeakerBoostLabel()" onclick="event.stopPropagation()">
+                            <span id="speaker-boost-value" class="boost-value">3x</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Second Row: Extract Button -->
+                <div style="display: flex; gap: 0.75rem; align-items: stretch;">
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn-upload-denoise" style="height: 56px; padding: 0.75rem 1.5rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); white-space: nowrap; width: 100%;">
+                        <span>🎯</span>
+                        <span>Extract Voice</span>
+                    </button>
+                </div>
+                
+                <div id="speaker-upload-status" class="muted" style="margin-top: 0.5rem;"></div>
+            </form>
+            
+            <div class="divider"></div>
+            
+            <h3 style="font-size: 1rem; margin-bottom: 0.75rem;">Your Extracted Voices</h3>
+            <div id="speaker-files-list" style="max-height: 300px; overflow-y: auto;">
                 <div class="empty">No files yet</div>
             </div>
         </div>

@@ -128,3 +128,40 @@ class AudioBoostFile(models.Model):
     
     def __str__(self):
         return f"{self.owner.username} - {self.original_filename} ({self.boost_level}/{self.status})"
+
+
+class SpeakerExtractionFile(models.Model):
+    """Stores user-uploaded audio files for speaker extraction/voice isolation."""
+    PROCESSING_STATUS = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('error', 'Error'),
+    ]
+    
+    BOOST_LEVEL = [
+        ('none', 'No Boost'),
+        ('2x', '2x Volume'),
+        ('3x', '3x Volume'),
+        ('4x', '4x Volume'),
+        ('5x', '5x Volume'),
+    ]
+    
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='speaker_extraction_files')
+    original_filename = models.CharField(max_length=255)
+    target_speaker_filename = models.CharField(max_length=255)
+    conversation_file = models.FileField(upload_to='uploads/speaker_extraction/conversations/')
+    target_speaker_file = models.FileField(upload_to='uploads/speaker_extraction/targets/')
+    extracted_file = models.FileField(upload_to='uploads/speaker_extraction/extracted/', null=True, blank=True)
+    similarity_score = models.FloatField(null=True, blank=True)
+    boost_level = models.CharField(max_length=10, choices=BOOST_LEVEL, default='none')
+    status = models.CharField(max_length=20, choices=PROCESSING_STATUS, default='pending')
+    error_message = models.TextField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-uploaded_at']
+    
+    def __str__(self):
+        return f"{self.owner.username} - {self.original_filename} ({self.status})"
