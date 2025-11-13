@@ -1,0 +1,509 @@
+{
+	"info": {
+		"_postman_id": "audio-processing-services",
+		"name": "Audio Processing Services API",
+		"description": "Complete API collection for audio processing services including file denoise, vocal separation, audio boost, and speaker extraction.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "value",
+				"value": "{{sessionid}}",
+				"type": "string"
+			},
+			{
+				"key": "key",
+				"value": "sessionid",
+				"type": "string"
+			},
+			{
+				"key": "in",
+				"value": "header",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "csrf_token",
+			"value": "your-csrf-token-here",
+			"type": "string"
+		},
+		{
+			"key": "sessionid",
+			"value": "your-session-id-here",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. File Denoise Service",
+			"item": [
+				{
+					"name": "Upload Audio File for Denoising",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "audio_file",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "boost_level",
+									"value": "2x",
+									"type": "text",
+									"description": "Options: none, 2x, 3x, 4x, 5x"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/denoise/upload/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"denoise",
+								"upload",
+								""
+							]
+						},
+						"description": "Upload an audio file for noise reduction. Optionally apply volume boost."
+					},
+					"response": []
+				},
+				{
+					"name": "List Denoised Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/denoise/files/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"denoise",
+								"files",
+								""
+							]
+						},
+						"description": "Retrieve all denoised files for the authenticated user."
+					},
+					"response": []
+				},
+				{
+					"name": "Get File Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/denoise/files/123/status/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"denoise",
+								"files",
+								"123",
+								"status",
+								""
+							]
+						},
+						"description": "Check processing status of a specific file."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Denoised File",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/denoise/files/123/delete/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"denoise",
+								"files",
+								"123",
+								"delete",
+								""
+							]
+						},
+						"description": "Delete a denoised file and its processed version."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Vocal Separation Service",
+			"item": [
+				{
+					"name": "Upload File for Vocal Separation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "audio_file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/vocal/separate/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vocal",
+								"separate",
+								""
+							]
+						},
+						"description": "Separate vocals from instrumental using Demucs AI."
+					},
+					"response": []
+				},
+				{
+					"name": "List Vocal Separation Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/vocal/files/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vocal",
+								"files",
+								""
+							]
+						},
+						"description": "Retrieve all vocal separation files."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Vocal Separation Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/vocal/files/456/status/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vocal",
+								"files",
+								"456",
+								"status",
+								""
+							]
+						},
+						"description": "Check processing status of vocal separation."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Vocal Separation File",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/vocal/files/456/delete/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"vocal",
+								"files",
+								"456",
+								"delete",
+								""
+							]
+						},
+						"description": "Delete vocal separation file and outputs."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Audio Boost Service",
+			"item": [
+				{
+					"name": "Upload File for Audio Boost",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "audio_file",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "boost_level",
+									"value": "medium",
+									"type": "text",
+									"description": "Options: gentle, medium, strong, max"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/boost/upload/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"boost",
+								"upload",
+								""
+							]
+						},
+						"description": "Upload audio file for volume boost/normalization."
+					},
+					"response": []
+				},
+				{
+					"name": "List Audio Boost Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/boost/files/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"boost",
+								"files",
+								""
+							]
+						},
+						"description": "Retrieve all audio boost files."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Audio Boost Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/boost/files/789/status/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"boost",
+								"files",
+								"789",
+								"status",
+								""
+							]
+						},
+						"description": "Check processing status of audio boost."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Audio Boost File",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/boost/files/789/delete/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"boost",
+								"files",
+								"789",
+								"delete",
+								""
+							]
+						},
+						"description": "Delete audio boost file."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Speaker Extraction Service",
+			"item": [
+				{
+					"name": "Upload Files for Speaker Extraction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "conversation_file",
+									"type": "file",
+									"src": [],
+									"description": "Audio with multiple speakers"
+								},
+								{
+									"key": "target_speaker_file",
+									"type": "file",
+									"src": [],
+									"description": "Sample of target speaker"
+								},
+								{
+									"key": "boost_level",
+									"value": "2x",
+									"type": "text",
+									"description": "Options: none, 2x, 3x, 4x, 5x"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/speaker/extract/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"speaker",
+								"extract",
+								""
+							]
+						},
+						"description": "Extract target speaker's voice from conversation audio."
+					},
+					"response": []
+				},
+				{
+					"name": "List Speaker Extraction Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/speaker/files/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"speaker",
+								"files",
+								""
+							]
+						},
+						"description": "Retrieve all speaker extraction files."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Speaker Extraction File",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-CSRFToken",
+								"value": "{{csrf_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/speaker/files/999/delete/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"speaker",
+								"files",
+								"999",
+								"delete",
+								""
+							]
+						},
+						"description": "Delete speaker extraction files."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
