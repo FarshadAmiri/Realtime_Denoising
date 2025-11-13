@@ -446,14 +446,14 @@ curl -X DELETE http://your-domain.com/api/vocal/files/456/delete/ \
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | audio_file | File | Yes | Audio file (MP3, WAV, M4A, FLAC) |
-| boost_level | String | No | Boost intensity: 'gentle', 'medium', 'strong', 'max' (default: 'medium') |
+| boost_level | String | No | Boost intensity: '2x', '3x', '4x', '5x' (default: '3x') |
 
 **Example Request (cURL):**
 ```bash
 curl -X POST http://your-domain.com/api/boost/upload/ \
   -H "X-CSRFToken: your-csrf-token" \
   -F "audio_file=@/path/to/quiet_audio.mp3" \
-  -F "boost_level=strong" \
+  -F "boost_level=4x" \
   -b "sessionid=your-session-id"
 ```
 
@@ -463,7 +463,7 @@ import requests
 
 url = "http://your-domain.com/api/boost/upload/"
 files = {'audio_file': open('quiet_audio.mp3', 'rb')}
-data = {'boost_level': 'strong'}
+data = {'boost_level': '4x'}
 headers = {'X-CSRFToken': 'your-csrf-token'}
 cookies = {'sessionid': 'your-session-id'}
 
@@ -481,10 +481,10 @@ print(response.json())
 ```
 
 **Boost Levels:**
-- `gentle`: Subtle volume increase (safe for most audio)
-- `medium`: Moderate volume boost (recommended)
-- `strong`: Significant volume increase
-- `max`: Maximum safe volume boost
+- `2x`: 2x volume increase
+- `3x`: 3x volume increase (recommended)
+- `4x`: 4x volume increase
+- `5x`: 5x volume increase (maximum)
 
 **Error Response (400 Bad Request):**
 ```json

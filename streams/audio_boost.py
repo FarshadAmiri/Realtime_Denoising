@@ -20,11 +20,11 @@ def upload_boost_file(request):
         return Response({'error': 'No file provided'}, status=400)
     
     file = request.FILES['file']
-    boost_level = request.data.get('boost_level', 'medium')
+    boost_level = request.data.get('boost_level', '3x')
     
     # Validate boost level
-    if boost_level not in ['gentle', 'medium', 'strong', 'max']:
-        boost_level = 'medium'
+    if boost_level not in ['2x', '3x', '4x', '5x']:
+        boost_level = '3x'
     
     # Validate file type
     allowed_extensions = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac']
@@ -140,10 +140,10 @@ def process_audio_boost(file_id):
         
         # Volume multipliers based on boost level
         volume_multipliers = {
-            'gentle': 2.0,   # 2x volume
-            'medium': 3.0,   # 3x volume
-            'strong': 4.0,   # 4x volume
-            'max': 5.0,      # 5x volume
+            '2x': 2.0,   # 2x volume
+            '3x': 3.0,   # 3x volume
+            '4x': 4.0,   # 4x volume
+            '5x': 5.0,   # 5x volume
         }
         
         multiplier = volume_multipliers.get(audio_file.boost_level, 3.0)

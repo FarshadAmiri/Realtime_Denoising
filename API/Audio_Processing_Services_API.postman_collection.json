@@ -303,9 +303,9 @@
 								},
 								{
 									"key": "boost_level",
-									"value": "medium",
+									"value": "3x",
 									"type": "text",
-									"description": "Options: gentle, medium, strong, max"
+									"description": "Options: 2x, 3x, 4x, 5x"
 								}
 							]
 						},

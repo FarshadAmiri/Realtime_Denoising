@@ -201,13 +201,13 @@ class AudioProcessingClient:
     
     # ==================== AUDIO BOOST ====================
     
-    def boost_audio(self, file_path: str, boost_level: str = 'medium') -> Dict:
+    def boost_audio(self, file_path: str, boost_level: str = '3x') -> Dict:
         """
         Upload audio file for volume boost.
         
         Args:
             file_path: Path to audio file
-            boost_level: Boost intensity ('gentle', 'medium', 'strong', 'max')
+            boost_level: Boost intensity ('2x', '3x', '4x', '5x')
             
         Returns:
             Response dict with file_id
@@ -378,7 +378,7 @@ if __name__ == "__main__":
     
     # Example 3: Boost audio
     print("\n=== Boosting Audio ===")
-    result = client.boost_audio("quiet_audio.mp3", boost_level="strong")
+    result = client.boost_audio("quiet_audio.mp3", boost_level="4x")
     
     if result.get('status') == 'success':
         file_id = result['file_id']

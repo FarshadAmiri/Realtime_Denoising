@@ -79,10 +79,10 @@ curl -X DELETE /api/vocal/files/456/delete/
 POST /api/boost/upload/
 curl -X POST /api/boost/upload/ \
   -F "audio_file=@quiet.mp3" \
-  -F "boost_level=strong"
+  -F "boost_level=4x"
 ```
 
-**Boost Levels:** `gentle`, `medium`, `strong`, `max`
+**Boost Levels:** `2x`, `3x`, `4x`, `5x`
 
 ### List Files
 ```bash
