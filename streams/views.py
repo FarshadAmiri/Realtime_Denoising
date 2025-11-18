@@ -563,6 +563,8 @@ def process_audio_file(file_id):
         audio_file.duration = duration
         audio_file.save()
         
+        print(f"Audio duration: {duration:.2f} seconds")
+        
         # Save as temporary WAV for denoising
         temp_wav_input = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
         sf.write(temp_wav_input.name, data, sr)
@@ -574,7 +576,19 @@ def process_audio_file(file_id):
         
         # Import and use dfn2 denoise function
         import dfn2
-        dfn2.denoise_file(temp_wav_input.name, temp_output.name)
+        
+        # Use chunked processing for files longer than 10 minutes
+        if duration > 600:  # 10 minutes
+            print(f"File is {duration/60:.1f} minutes - using chunked processing...")
+            result = dfn2.denoise_file_chunked(
+                temp_wav_input.name,
+                temp_output.name,
+                chunk_duration=30,
+                overlap_duration=1
+            )
+            print(f"Chunked processing complete: {result.get('num_chunks')} chunks processed")
+        else:
+            dfn2.denoise_file(temp_wav_input.name, temp_output.name)
         
         # Apply volume boost if requested
         if audio_file.boost_level != 'none':
@@ -611,17 +625,48 @@ def process_audio_file(file_id):
             os.unlink(temp_output.name)
             temp_output.name = temp_boosted.name
         
-        # Save denoised (and optionally boosted) file to model
+        # Convert to MP3 to reduce file size (especially important for long files)
+        print("Converting to MP3 for smaller file size...")
+        temp_mp3 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+        temp_mp3.close()
+        
+        mp3_cmd = [
+            'ffmpeg',
+            '-i', temp_output.name,
+            '-b:a', '192k',  # 192 kbps bitrate
+            '-y',
+            temp_mp3.name
+        ]
+        
+        subprocess.run(
+            mp3_cmd,
+            check=True,
+            capture_output=True,
+            timeout=600
+        )
+        
+        # Use MP3 as final output
+        os.unlink(temp_output.name)
+        temp_output.name = temp_mp3.name
+        
+        # Save denoised (and optionally boosted) file as MP3
         denoised_filename = f"denoised_{audio_file.original_filename}"
-        if not denoised_filename.lower().endswith('.wav'):
-            denoised_filename = os.path.splitext(denoised_filename)[0] + '.wav'
+        denoised_filename = os.path.splitext(denoised_filename)[0] + '.mp3'
         
         with open(temp_output.name, 'rb') as f:
-            audio_file.denoised_file.save(denoised_filename, File(f), save=False)
+            audio_file.denoised_file.save(denoised_filename, File(f), save=True)
         
+        # Mark as completed
         audio_file.status = 'completed'
         audio_file.processed_at = timezone.now()
         audio_file.save()
+        
+        # Force a database refresh to ensure the changes are committed
+        audio_file.refresh_from_db()
+        
+        print(f"✓ Processing completed successfully! File ID: {audio_file.id}, Status: {audio_file.status}")
+        print(f"  Output file: {audio_file.denoised_file.name}")
+        print(f"  File URL: {audio_file.denoised_file.url if audio_file.denoised_file else 'None'}")
         
         # Cleanup temp files
         try:

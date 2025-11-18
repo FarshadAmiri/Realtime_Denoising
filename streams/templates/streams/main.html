@@ -8,6 +8,17 @@
 <link rel="stylesheet" href="{% static 'css/modal-tabs.css' %}">
 {% endblock %}
 
+{% block extra_js %}
+<script id="cfg" type="application/json">{"browserAudioProcessing": {{ browser_audio_processing|yesno:"true,false" }}}</script>
+<script>
+// Pass Django template variables to JavaScript
+window.CURRENT_USER = "{{ user.username }}";
+window.USER_ID = {{ user.id }};
+</script>
+<script src="{% static 'js/modal-tabs-new.js' %}?v=1720"></script>
+<script src="{% static 'js/main.js' %}?v=1720"></script>
+{% endblock %}
+
 {% block content %}
 <div class="layout">
     <!-- Sidebar -->
@@ -408,13 +419,3 @@
 
 {% endblock %}
 
-{% block extra_js %}
-<script id="cfg" type="application/json">{"browserAudioProcessing": {{ browser_audio_processing|yesno:"true,false" }}}</script>
-<script>
-// Pass Django template variables to JavaScript
-window.CURRENT_USER = "{{ user.username }}";
-window.USER_ID = {{ user.id }};
-</script>
-<script src="{% static 'js/main.js' %}"></script>
-<script src="{% static 'js/modal-tabs.js' %}"></script>
-{% endblock %}

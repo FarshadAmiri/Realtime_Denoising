@@ -8,3 +8,8 @@
 
 * separate a specific person voice from an audio
 
+* Add chunking to all modes (Speaker extraction, vocal separation, boost)
+
+* Add voice personage changer
+
+* Add sound bars and lines to file denoise 

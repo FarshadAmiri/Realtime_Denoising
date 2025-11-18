@@ -135,7 +135,139 @@ def denoise_file(
     return result
 
 
-__all__ = ["denoise_file"]
+def denoise_file_chunked(
+    input_path: Union[str, Path],
+    output_path: Union[str, Path],
+    chunk_duration: int = 30,
+    overlap_duration: int = 1,
+    force_reinit: bool = False,
+) -> Dict[str, Union[str, int]]:
+    """
+    Denoise a long audio file by processing it in chunks with crossfading.
+    Handles files of any length by processing in segments to avoid memory issues.
+    
+    Args:
+        input_path: Path to input audio file
+        output_path: Path to save denoised output
+        chunk_duration: Duration of each chunk in seconds (default: 30)
+        overlap_duration: Overlap between chunks for crossfading in seconds (default: 1)
+        force_reinit: Force model reinitialization
+    
+    Returns:
+        Dictionary with processing info
+    """
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+    
+    bundle = _init_model(force=force_reinit)
+    model = bundle.model
+    df_state = bundle.df_state
+    model_sr = df_config("sr", 48000, int, section="df")
+    
+    logger.info(f"Loading full audio metadata from {input_path}")
+    
+    # Load metadata to get duration
+    import soundfile as sf
+    info = sf.info(str(input_path))
+    original_sr = info.samplerate
+    total_samples = info.frames
+    total_duration = total_samples / original_sr
+    
+    logger.info(f"Audio duration: {total_duration:.2f}s, sample rate: {original_sr}Hz")
+    
+    # Calculate chunk parameters
+    chunk_samples = int(chunk_duration * original_sr)
+    overlap_samples = int(overlap_duration * original_sr)
+    hop_samples = chunk_samples - overlap_samples
+    
+    num_chunks = int(np.ceil((total_samples - overlap_samples) / hop_samples))
+    logger.info(f"Processing in {num_chunks} chunks of {chunk_duration}s with {overlap_duration}s overlap")
+    
+    # Process chunks
+    enhanced_chunks = []
+    
+    for i in range(num_chunks):
+        start_sample = i * hop_samples
+        end_sample = min(start_sample + chunk_samples, total_samples)
+        
+        logger.info(f"Processing chunk {i+1}/{num_chunks} (samples {start_sample}-{end_sample})")
+        
+        # Read chunk
+        audio_chunk, sr = sf.read(
+            str(input_path),
+            start=start_sample,
+            stop=end_sample,
+            dtype='float32',
+            always_2d=False
+        )
+        
+        # Ensure mono
+        if audio_chunk.ndim > 1:
+            audio_chunk = np.mean(audio_chunk, axis=1)
+        
+        # Resample if needed
+        if sr != model_sr:
+            audio_chunk_tensor = torch.from_numpy(audio_chunk).unsqueeze(0)
+            audio_chunk_tensor = resample(audio_chunk_tensor, sr, model_sr)
+        else:
+            audio_chunk_tensor = torch.from_numpy(audio_chunk).unsqueeze(0)
+        
+        # Denoise chunk
+        with torch.inference_mode():
+            enhanced_chunk = enhance(model, df_state, audio_chunk_tensor).cpu().clone()
+        
+        # Resample back if needed
+        if sr != model_sr:
+            enhanced_chunk = resample(enhanced_chunk, model_sr, sr)
+        
+        enhanced_chunks.append(enhanced_chunk.squeeze(0).numpy())
+    
+    # Concatenate chunks with crossfading
+    logger.info("Concatenating chunks with crossfading...")
+    
+    if len(enhanced_chunks) == 1:
+        final_audio = enhanced_chunks[0]
+    else:
+        final_audio = enhanced_chunks[0]
+        
+        for i in range(1, len(enhanced_chunks)):
+            chunk = enhanced_chunks[i]
+            
+            # Crossfade overlap region
+            if len(final_audio) >= overlap_samples and len(chunk) >= overlap_samples:
+                fade_out = np.linspace(1.0, 0.0, overlap_samples)
+                fade_in = np.linspace(0.0, 1.0, overlap_samples)
+                
+                # Apply crossfade
+                final_audio[-overlap_samples:] = (
+                    final_audio[-overlap_samples:] * fade_out +
+                    chunk[:overlap_samples] * fade_in
+                )
+                
+                # Append rest of chunk
+                final_audio = np.concatenate([final_audio, chunk[overlap_samples:]])
+            else:
+                # No overlap, just concatenate
+                final_audio = np.concatenate([final_audio, chunk])
+    
+    # Save output
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(output_path), final_audio, original_sr)
+    
+    output_size_mb = output_path.stat().st_size / (1024 * 1024)
+    logger.info(f"Saved enhanced audio -> {output_path} ({output_size_mb:.2f} MB)")
+    
+    return {
+        "input_path": str(input_path),
+        "enhanced_path": str(output_path),
+        "original_sample_rate": original_sr,
+        "num_chunks": num_chunks,
+        "total_duration": total_duration,
+        "output_size_mb": output_size_mb,
+    }
+
+
+__all__ = ["denoise_file", "denoise_file_chunked"]
 
 def denoise(
     input_mode: str,
