@@ -1348,6 +1348,7 @@ function updateFileInputUI() {
 // Listen for file selection
 document.getElementById('audio-file-input').addEventListener('change', updateFileInputUI);
 
+/* Commented out - refreshDenoiseFilesList is now in modal-tabs-new.js with waveform visualization
 async function refreshDenoiseFilesList() {
     try {
         const resp = await fetch('/api/denoise/files/', { credentials: 'same-origin' });
@@ -1501,6 +1502,10 @@ async function refreshDenoiseFilesList() {
         console.error('Error refreshing denoise files:', e);
     }
 }
+*/
+
+// NOTE: refreshDenoiseFilesList is now defined in modal-tabs-new.js with waveform features
+// The function above is commented out to avoid overriding the enhanced version
 
 // NOTE: File upload handler moved to modal-tabs.js to avoid duplicate submissions
 // The upload-form event listener is now in modal-tabs.js with boost level support

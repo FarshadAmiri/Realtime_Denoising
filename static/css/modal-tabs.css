@@ -79,6 +79,16 @@
     min-width: 200px;
 }
 
+/* Hide the actual file input element */
+.file-input-wrapper input[type="file"] {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
 .file-input-label {
     display: flex;
     align-items: center;
@@ -219,6 +229,53 @@
 [data-theme="dark"] #denoise-files-list::-webkit-scrollbar-thumb:hover,
 [data-theme="dark"] #vocal-files-list::-webkit-scrollbar-thumb:hover {
     background: #6b7280;
+}
+
+/* ====== WAVEFORM VISUALIZATION ====== */
+.btn-waveform-toggle:hover {
+    background: #e0f2fe !important;
+    border-color: #38bdf8 !important;
+    transform: translateY(-1px);
+}
+
+.btn-waveform-toggle:active {
+    transform: translateY(0);
+}
+
+.waveform-comparison canvas {
+    display: block;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Dark mode for waveform visualization */
+[data-theme="dark"] .btn-waveform-toggle {
+    background: #374151 !important;
+    border-color: #4b5563 !important;
+    color: #d1d5db !important;
+}
+
+[data-theme="dark"] .btn-waveform-toggle:hover {
+    background: #1e293b !important;
+    border-color: #3b82f6 !important;
+}
+
+[data-theme="dark"] .waveform-comparison .waveform-content {
+    background: #2e2e2e00 !important;
+    border-color: #2f2f2f00 !important;
+}
+
+[data-theme="dark"] .waveform-comparison .waveform-title {
+    color: #d1d5db !important;
+}
+
+[data-theme="dark"] .waveform-comparison .legend-text {
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] .waveform-comparison canvas {
+    background: #111827 !important;
+    border-color: #374151 !important;
 }
 
 /* ====== VOLUME BOOST CONTROLS ====== */

@@ -759,7 +759,7 @@ window.refreshDenoiseFilesList = async function refreshDenoiseFilesList() {
     const list = document.getElementById('denoise-files-list');
     if (!list) return;
     
-    console.log('[DENOISE] refreshDenoiseFilesList called');
+    console.log('[DENOISE] refreshDenoiseFilesList called - VERSION 1.1 WITH WAVEFORMS');
     
     try {
         const resp = await fetch('/api/denoise/files/', {
@@ -813,12 +813,28 @@ window.refreshDenoiseFilesList = async function refreshDenoiseFilesList() {
             leftHeader.appendChild(fileName);
             leftHeader.appendChild(uploadDate);
             
+            console.log('[DENOISE] Creating waveform toggle button for file:', file.original_filename);
+            
+            // Waveform toggle button
+            const waveformToggle = document.createElement('button');
+            waveformToggle.className = 'btn-waveform-toggle';
+            waveformToggle.innerHTML = '📊 Compare';
+            waveformToggle.style.marginRight = '0.5rem';
+            waveformToggle.style.padding = '0.3rem 0.6rem';
+            waveformToggle.style.fontSize = '0.75rem';
+            waveformToggle.style.border = '1px solid #cbd5e1';
+            waveformToggle.style.borderRadius = '6px';
+            waveformToggle.style.background = '#f8fafc';
+            waveformToggle.style.cursor = 'pointer';
+            waveformToggle.style.transition = 'all 0.2s';
+            
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn-delete-file';
             deleteBtn.textContent = '❌';
             deleteBtn.onclick = () => deleteDenoiseFile(file.id, file.original_filename);
             
             header.appendChild(leftHeader);
+            header.appendChild(waveformToggle);
             header.appendChild(deleteBtn);
             
             // Audio players section - full width layout
@@ -920,7 +936,99 @@ window.refreshDenoiseFilesList = async function refreshDenoiseFilesList() {
             audiosContainer.appendChild(originalBox);
             audiosContainer.appendChild(denoisedBox);
             
+            // Waveform comparison section (collapsible)
+            const waveformSection = document.createElement('div');
+            waveformSection.className = 'waveform-comparison';
+            waveformSection.style.maxHeight = '0';
+            waveformSection.style.overflow = 'hidden';
+            waveformSection.style.transition = 'max-height 0.3s ease-out';
+            waveformSection.style.marginBottom = '0.5rem';
+            
+            const waveformContent = document.createElement('div');
+            waveformContent.className = 'waveform-content';
+            waveformContent.style.padding = '0.75rem';
+            waveformContent.style.background = '#f1f5f9';
+            waveformContent.style.borderRadius = '8px';
+            waveformContent.style.border = '1px solid #e2e8f0';
+            
+            const waveformTitle = document.createElement('div');
+            waveformTitle.className = 'waveform-title';
+            waveformTitle.style.fontSize = '0.85rem';
+            waveformTitle.style.fontWeight = '600';
+            waveformTitle.style.marginBottom = '0.75rem';
+            waveformTitle.style.color = '#475569';
+            waveformTitle.textContent = '🎵 Waveform Comparison';
+            
+            const canvasContainer = document.createElement('div');
+            canvasContainer.style.display = 'flex';
+            canvasContainer.style.flexDirection = 'column';
+            canvasContainer.style.gap = '0.5rem';
+            canvasContainer.style.marginTop = '0.5rem';
+            
+            // Legend
+            const legend = document.createElement('div');
+            legend.style.display = 'flex';
+            legend.style.gap = '1rem';
+            legend.style.justifyContent = 'center';
+            legend.style.fontSize = '0.75rem';
+            legend.style.fontWeight = '500';
+            
+            const originalLegend = document.createElement('div');
+            originalLegend.style.display = 'flex';
+            originalLegend.style.alignItems = 'center';
+            originalLegend.style.gap = '0.4rem';
+            originalLegend.innerHTML = '<span style="display:inline-block;width:16px;height:3px;background:#ef4444;border-radius:2px;"></span><span class="legend-text" style="color:#64748b;">📁 Original</span>';
+            
+            const denoisedLegend = document.createElement('div');
+            denoisedLegend.style.display = 'flex';
+            denoisedLegend.style.alignItems = 'center';
+            denoisedLegend.style.gap = '0.4rem';
+            denoisedLegend.innerHTML = '<span style="display:inline-block;width:16px;height:3px;background:#10b981;border-radius:2px;"></span><span class="legend-text" style="color:#64748b;">✨ Denoised</span>';
+            
+            legend.appendChild(originalLegend);
+            legend.appendChild(denoisedLegend);
+            
+            // Single merged canvas
+            const mergedCanvas = document.createElement('canvas');
+            mergedCanvas.width = 800;
+            mergedCanvas.height = 120;
+            mergedCanvas.style.width = '100%';
+            mergedCanvas.style.height = 'auto';
+            mergedCanvas.style.border = '1px solid #cbd5e1';
+            mergedCanvas.style.borderRadius = '4px';
+            mergedCanvas.style.background = '#ffffff';
+            
+            canvasContainer.appendChild(legend);
+            canvasContainer.appendChild(mergedCanvas);
+            
+            waveformContent.appendChild(waveformTitle);
+            waveformContent.appendChild(canvasContainer);
+            waveformSection.appendChild(waveformContent);
+            
+            // Toggle waveform section
+            let waveformExpanded = false;
+            waveformToggle.onclick = async () => {
+                if (!waveformExpanded) {
+                    waveformToggle.innerHTML = '📊 Hide';
+                    waveformToggle.style.background = '#e0f2fe';
+                    waveformSection.style.maxHeight = '400px';
+                    waveformExpanded = true;
+                    
+                    // Load and render merged waveforms only once when expanded
+                    if (!mergedCanvas.dataset.loaded) {
+                        await renderMergedWaveforms(file.original_file_url, file.denoised_file_url, mergedCanvas);
+                        mergedCanvas.dataset.loaded = 'true';
+                    }
+                } else {
+                    waveformToggle.innerHTML = '📊 Compare';
+                    waveformToggle.style.background = '#f8fafc';
+                    waveformSection.style.maxHeight = '0';
+                    waveformExpanded = false;
+                }
+            };
+            
             item.appendChild(header);
+            item.appendChild(waveformSection);
             item.appendChild(audiosContainer);
             list.appendChild(item);
         });
@@ -928,6 +1036,249 @@ window.refreshDenoiseFilesList = async function refreshDenoiseFilesList() {
     } catch (e) {
         console.error('Error refreshing denoise files:', e);
         list.innerHTML = '<div class="empty" style="color: #991b1b;">Error loading files</div>';
+    }
+}
+
+async function renderMergedWaveforms(originalUrl, denoisedUrl, canvas) {
+    try {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // Detect dark mode
+        const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+        const bgColor = isDarkMode ? '#111827' : '#ffffff';
+        const gridColor = isDarkMode ? '#374151' : '#e2e8f0';
+        
+        // Clear canvas
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, width, height);
+        
+        // Show loading state
+        ctx.fillStyle = isDarkMode ? '#9ca3af' : '#94a3b8';
+        ctx.font = '14px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Loading waveforms...', width / 2, height / 2);
+        
+        // Fetch and decode both audio files
+        const [originalResponse, denoisedResponse] = await Promise.all([
+            fetch(originalUrl),
+            denoisedUrl ? fetch(denoisedUrl) : null
+        ]);
+        
+        const [originalBuffer, denoisedBuffer] = await Promise.all([
+            originalResponse.arrayBuffer(),
+            denoisedResponse ? denoisedResponse.arrayBuffer() : null
+        ]);
+        
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const [originalAudioBuffer, denoisedAudioBuffer] = await Promise.all([
+            audioContext.decodeAudioData(originalBuffer),
+            denoisedBuffer ? audioContext.decodeAudioData(denoisedBuffer) : null
+        ]);
+        
+        // Process both waveforms
+        const processWaveform = (audioBuffer) => {
+            const rawData = audioBuffer.getChannelData(0);
+            const samples = width;
+            const blockSize = Math.floor(rawData.length / samples);
+            const filteredData = [];
+            
+            for (let i = 0; i < samples; i++) {
+                let blockStart = blockSize * i;
+                let sum = 0;
+                for (let j = 0; j < blockSize; j++) {
+                    sum += Math.abs(rawData[blockStart + j]);
+                }
+                filteredData.push(sum / blockSize);
+            }
+            
+            const maxAmplitude = Math.max(...filteredData);
+            return filteredData.map(n => n / maxAmplitude);
+        };
+        
+        const originalData = processWaveform(originalAudioBuffer);
+        const denoisedData = denoisedAudioBuffer ? processWaveform(denoisedAudioBuffer) : null;
+        
+        // Clear canvas and draw
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, width, height);
+        
+        // Draw grid lines
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, height / 2);
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+        
+        const padding = 2;
+        const heightScale = (height / 2) - padding;
+        
+        // Draw original waveform (red) with slight transparency
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)'; // #ef4444 with transparency
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < originalData.length; i++) {
+            const x = i;
+            const y = height / 2 - (originalData[i] * heightScale);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        
+        // Mirror original
+        ctx.beginPath();
+        for (let i = 0; i < originalData.length; i++) {
+            const x = i;
+            const y = height / 2 + (originalData[i] * heightScale);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        
+        // Draw denoised waveform (green) if available
+        if (denoisedData) {
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'; // #10b981 with transparency
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let i = 0; i < denoisedData.length; i++) {
+                const x = i;
+                const y = height / 2 - (denoisedData[i] * heightScale);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Mirror denoised
+            ctx.beginPath();
+            for (let i = 0; i < denoisedData.length; i++) {
+                const x = i;
+                const y = height / 2 + (denoisedData[i] * heightScale);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+        
+        audioContext.close();
+        
+    } catch (error) {
+        console.error('Error rendering merged waveforms:', error);
+        const ctx = canvas.getContext('2d');
+        const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+        const bgColor = isDarkMode ? '#111827' : '#ffffff';
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Error loading waveforms', canvas.width / 2, canvas.height / 2);
+    }
+}
+
+async function renderWaveform(audioUrl, canvas, color) {
+    try {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // Clear canvas
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        
+        // Show loading state
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Loading waveform...', width / 2, height / 2);
+        
+        // Fetch audio file
+        const response = await fetch(audioUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // Decode audio data
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // Get audio data from first channel
+        const rawData = audioBuffer.getChannelData(0);
+        const samples = width; // One sample per pixel width
+        const blockSize = Math.floor(rawData.length / samples);
+        const filteredData = [];
+        
+        // Downsample audio data to fit canvas width
+        for (let i = 0; i < samples; i++) {
+            let blockStart = blockSize * i;
+            let sum = 0;
+            for (let j = 0; j < blockSize; j++) {
+                sum += Math.abs(rawData[blockStart + j]);
+            }
+            filteredData.push(sum / blockSize);
+        }
+        
+        // Normalize data
+        const maxAmplitude = Math.max(...filteredData);
+        const normalizedData = filteredData.map(n => n / maxAmplitude);
+        
+        // Clear canvas and draw waveform
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        
+        // Draw grid lines
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, height / 2);
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+        
+        // Draw waveform
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        
+        const padding = 2;
+        const heightScale = (height / 2) - padding;
+        
+        for (let i = 0; i < normalizedData.length; i++) {
+            const x = i;
+            const y = height / 2 - (normalizedData[i] * heightScale);
+            
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+        
+        // Draw mirrored waveform below centerline
+        ctx.beginPath();
+        for (let i = 0; i < normalizedData.length; i++) {
+            const x = i;
+            const y = height / 2 + (normalizedData[i] * heightScale);
+            
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+        
+        // Close audio context
+        audioContext.close();
+        
+    } catch (error) {
+        console.error('Error rendering waveform:', error);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Error loading waveform', canvas.width / 2, canvas.height / 2);
     }
 }
 

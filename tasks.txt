@@ -1,15 +1,5 @@
-* Add these modes to denoise a file:
-
-    ** separate bcg audio and over voice
-
-    ** amplify an audio
-
-* RestAPI for denoise a file (or with its modes)
-
-* separate a specific person voice from an audio
-
-* Add chunking to all modes (Speaker extraction, vocal separation, boost)
-
 * Add voice personage changer
 
-* Add sound bars and lines to file denoise 
+* Add sound bars and lines to file denoise
+
+* Implement Diarization with person's voice detector (Nvidia Nemo or ...)

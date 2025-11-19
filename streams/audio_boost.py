@@ -133,9 +133,9 @@ def process_audio_boost(file_id):
         output_dir = os.path.join(os.path.dirname(input_path), '..', 'boosted')
         os.makedirs(output_dir, exist_ok=True)
         
-        # Generate output filename
+        # Generate output filename (MP3 for compression)
         base_name = os.path.splitext(os.path.basename(input_path))[0]
-        output_filename = f"{base_name}_boosted.wav"
+        output_filename = f"{base_name}_boosted.mp3"
         output_path = os.path.join(output_dir, output_filename)
         
         # Volume multipliers based on boost level
@@ -148,13 +148,14 @@ def process_audio_boost(file_id):
         
         multiplier = volume_multipliers.get(audio_file.boost_level, 3.0)
         
-        print(f"Boosting audio volume by {multiplier}x")
+        print(f"[Audio Boost] Boosting volume by {multiplier}x and converting to MP3...")
         
-        # Apply volume boost using FFmpeg
+        # Apply volume boost and convert to MP3 using FFmpeg
         boost_cmd = [
             'ffmpeg',
             '-i', input_path,
             '-af', f'volume={multiplier}',
+            '-b:a', '192k',  # 192 kbps MP3 bitrate
             '-ar', '48000',  # Standard sample rate
             '-y',
             output_path
@@ -168,18 +169,21 @@ def process_audio_boost(file_id):
         )
         
         # Save boosted file to model
-        print(f"Saving boosted audio to database...")
+        print(f"[Audio Boost] Saving boosted MP3 to database...")
         with open(output_path, 'rb') as f:
             audio_file.boosted_file.save(
                 output_filename,
                 ContentFile(f.read()),
-                save=False
+                save=True
             )
         
-        # Update status
+        # Mark as completed
         audio_file.status = 'completed'
         audio_file.processed_at = timezone.now()
         audio_file.save()
+        
+        print(f"[Audio Boost] ✓ Processing completed - Status: {audio_file.status}")
+        print(f"  Output file: {audio_file.boosted_file.name}")
         
         # Clean up temporary file
         if os.path.exists(output_path):

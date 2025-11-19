@@ -186,16 +186,21 @@ def process_vocal_separation(file_id):
         # Save vocals file
         vocals_filename = f"vocals_{base_filename}.mp3"
         with open(vocals_path, 'rb') as f:
-            vocal_file.vocals_file.save(vocals_filename, File(f), save=False)
+            vocal_file.vocals_file.save(vocals_filename, File(f), save=True)
         
         # Save instrumental file
         instrumental_filename = f"instrumental_{base_filename}.mp3"
         with open(instrumental_path, 'rb') as f:
-            vocal_file.instrumental_file.save(instrumental_filename, File(f), save=False)
+            vocal_file.instrumental_file.save(instrumental_filename, File(f), save=True)
         
+        # Mark as completed
         vocal_file.status = 'completed'
         vocal_file.processed_at = timezone.now()
         vocal_file.save()
+        
+        print(f"[Vocal Separation] ✓ Files saved - Status: {vocal_file.status}")
+        print(f"  Vocals: {vocal_file.vocals_file.name}")
+        print(f"  Instrumental: {vocal_file.instrumental_file.name}")
         
         print(f"[Vocal Separation] Successfully completed processing for file {file_id}")
         
