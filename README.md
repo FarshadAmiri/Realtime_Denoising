@@ -14,6 +14,40 @@ Stream audio to your friends with AI-powered noise removal using DeepFilterNet2.
 - All streams get saved automatically
 - Admin panel for managing users and permissions
 
+## Available Tools & Services
+
+ClearCast provides a comprehensive suite of audio processing tools accessible via REST API:
+
+### 1. **File Denoising Service**
+   - Remove background noise from audio files using DeepFilterNet2
+   - Optional volume boost (2x-5x) after denoising
+   - Supports MP3, WAV, M4A, and FLAC formats
+   - Real-time processing status tracking
+
+### 2. **Vocal Separation Service**
+   - Extract vocals or instrumentals from audio files using Demucs
+   - Separate audio into vocals, drums, bass, and other instruments
+   - High-quality stem isolation powered by state-of-the-art source separation
+
+### 3. **Audio Boost Service**
+   - Amplify audio volume with customizable boost levels (2x-5x)
+   - Maintains audio quality while increasing loudness
+   - Perfect for quiet recordings or low-volume files
+
+### 4. **Speaker Extraction Service**
+   - Isolate and extract a specific speaker's voice from multi-speaker audio
+   - Upload a reference sample of the target speaker
+   - Uses advanced speaker recognition (ECAPA-VOXCELEB) and separation (SepFormer)
+   - Optional volume boost for extracted audio
+
+### 5. **Real-time Audio Streaming**
+   - WebRTC-based live audio streaming with friends
+   - Real-time noise reduction during streaming
+   - Automatic recording of all streams
+   - Presence tracking to see who's online and streaming
+
+All services are accessible through both the web interface and RESTful API endpoints. See `API/API_DOCUMENTATION.md` for detailed API usage.
+
 ## Tech Stack
 
 Django + Django Channels + WebRTC + Redis + DeepFilterNet2
