@@ -76,6 +76,11 @@ urlpatterns = [
     path('api/speaker/extract/', stream_views.upload_speaker_extraction, name='upload_speaker_extraction'),
     path('api/speaker/files/', stream_views.list_speaker_extraction_files, name='list_speaker_extraction_files'),
     path('api/speaker/files/<int:file_id>/delete/', stream_views.delete_speaker_extraction_file, name='delete_speaker_extraction_file'),
+    
+    # Voice cloning
+    path('api/voiceclone/convert/', stream_views.upload_voice_clone, name='upload_voice_clone'),
+    path('api/voiceclone/files/', stream_views.list_voice_clone_files, name='list_voice_clone_files'),
+    path('api/voiceclone/files/<int:file_id>/delete/', stream_views.delete_voice_clone_file, name='delete_voice_clone_file'),
 ]
 
 # Serve media files in development

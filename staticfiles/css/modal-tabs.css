@@ -43,10 +43,22 @@
 
 .modal-tab-content {
     display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .modal-tab-content.active {
     display: block;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 /* Dark mode modal tabs */
@@ -274,7 +286,7 @@
 }
 
 [data-theme="dark"] .waveform-comparison canvas {
-    background: #3a3a3a !important;
+    background: #111827 !important;
     border-color: #374151 !important;
 }
 

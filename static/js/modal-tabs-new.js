@@ -1,13 +1,93 @@
-// ===== MODAL TABS JS - v1720 =====
-console.log('modal-tabs.js loaded - v1720');
+// ===== MODAL TABS JS - v1736 =====
+console.log('✅ modal-tabs-new.js loaded - v1736 (INLINE STYLE FIX)');
+
+// ===== AUDIO PLAYBACK MANAGEMENT =====
+let currentlyPlayingAudio = null;
+let playingAudioStates = new Map(); // Store audio states by file ID
+
+// Setup audio element with playback tracking
+function setupAudioElement(audioElement, fileId) {
+    if (!audioElement) return;
+    
+    // Restore state if exists (before adding new listeners)
+    const savedState = playingAudioStates.get(fileId);
+    if (savedState) {
+        // Update element reference
+        savedState.element = audioElement;
+        
+        // Restore playback position
+        if (savedState.currentTime > 0) {
+            audioElement.currentTime = savedState.currentTime;
+        }
+        
+        // Restore playing state
+        if (savedState.playing) {
+            setTimeout(() => {
+                audioElement.play().catch(e => console.log('Auto-play prevented:', e));
+            }, 100);
+        }
+    }
+    
+    // Track play events
+    audioElement.addEventListener('play', function() {
+        currentlyPlayingAudio = this;
+        playingAudioStates.set(fileId, {
+            element: this,
+            currentTime: this.currentTime,
+            playing: true
+        });
+    });
+    
+    // Track pause events
+    audioElement.addEventListener('pause', function() {
+        const state = playingAudioStates.get(fileId);
+        if (state) {
+            state.playing = false;
+            state.currentTime = this.currentTime;
+        }
+        if (currentlyPlayingAudio === this) {
+            currentlyPlayingAudio = null;
+        }
+    });
+    
+    // Track time updates
+    audioElement.addEventListener('timeupdate', function() {
+        const state = playingAudioStates.get(fileId);
+        if (state) {
+            state.currentTime = this.currentTime;
+        }
+    });
+    
+    // Track seeking
+    audioElement.addEventListener('seeked', function() {
+        const state = playingAudioStates.get(fileId);
+        if (state) {
+            state.currentTime = this.currentTime;
+        }
+    });
+}
+
+// Check if any audio is playing to prevent refresh
+function isAnyAudioPlaying() {
+    for (let [fileId, state] of playingAudioStates) {
+        if (state.playing) {
+            return true;
+        }
+    }
+    return false;
+}
 
 // ===== GLOBAL DELETE FILE VARIABLES =====
-let deleteVocalFileId = null;
-let deleteVocalFileName = '';
-let deleteDenoiseFileId = null;
-let deleteDenoiseFileName = '';
-let deleteBoostFileId = null;
-let deleteBoostFileName = '';
+window.deleteVocalFileId = null;
+window.deleteVocalFileName = '';
+window.deleteDenoiseFileId = null;
+window.deleteDenoiseFileName = '';
+window.deleteBoostFileId = null;
+window.deleteBoostFileName = '';
+window.deleteSpeakerFileId = null;
+window.deleteSpeakerFileName = '';
+window.deleteVoiceCloneFileId = null;
+window.deleteVoiceCloneFileName = '';
 
 // ===== DENOISE MODEL PREFERENCE =====
 function getCookie(name) {
@@ -24,31 +104,6 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-
-// ===== GLOBAL DELETE MODAL FUNCTIONS =====
-window.closeDeleteFileModal = function() {
-    const modal = document.getElementById('delete-file-modal');
-    if (modal) {
-        modal.classList.remove('active');
-    }
-    // Reset all delete file IDs
-    deleteVocalFileId = null;
-    deleteVocalFileName = '';
-    deleteDenoiseFileId = null;
-    deleteDenoiseFileName = '';
-    deleteBoostFileId = null;
-    deleteBoostFileName = '';
-};
-
-window.confirmDeleteFile = function() {
-    if (deleteVocalFileId) {
-        confirmDeleteVocalFile();
-    } else if (deleteDenoiseFileId) {
-        confirmDeleteDenoiseFile();
-    } else if (deleteBoostFileId) {
-        confirmDeleteBoostFile();
-    }
-};
 
 // ===== DENOISE BOOST TOGGLE =====
 let isBoostEnabled = false;
@@ -191,6 +246,12 @@ function startDenoisePolling() {
     if (denoisePollingInterval) return; // Already polling
     
     denoisePollingInterval = setInterval(async () => {
+        // Skip refresh if audio is playing
+        if (isAnyAudioPlaying()) {
+            console.log('Skipping denoise refresh - audio playing');
+            return;
+        }
+        
         try {
             const resp = await fetch('/api/denoise/files/', { credentials: 'same-origin' });
             if (resp.ok) {
@@ -210,7 +271,7 @@ function startDenoisePolling() {
         } catch (e) {
             console.error('Polling error:', e);
         }
-    }, 3000); // Poll every 3 seconds
+    }, 10000); // Poll every 10 seconds
 }
 
 function stopDenoisePolling() {
@@ -222,6 +283,11 @@ function stopDenoisePolling() {
 
 // ===== MODAL TAB SWITCHING =====
 window.switchModalTab = function(tabName) {
+    // Pause any playing audio before switching
+    if (currentlyPlayingAudio && !currentlyPlayingAudio.paused) {
+        currentlyPlayingAudio.pause();
+    }
+    
     // Hide all tabs
     document.querySelectorAll('.modal-tab').forEach(tab => {
         tab.classList.remove('active');
@@ -269,10 +335,20 @@ window.switchModalTab = function(tabName) {
         if (typeof startSpeakerPolling === 'function') {
             startSpeakerPolling();
         }
+    } else if (tabName === 'voiceclone') {
+        if (typeof refreshVoiceCloneFilesList === 'function') {
+            refreshVoiceCloneFilesList();
+        }
+        if (typeof startVoiceClonePolling === 'function') {
+            startVoiceClonePolling();
+        }
     } else {
-        // Stop speaker polling when switching away
+        // Stop polling when switching away
         if (typeof stopSpeakerPolling === 'function') {
             stopSpeakerPolling();
+        }
+        if (typeof stopVoiceClonePolling === 'function') {
+            stopVoiceClonePolling();
         }
     }
 };
@@ -466,6 +542,7 @@ async function refreshVocalFilesList() {
             originalSrc.src = file.original_file_url;
             originalSrc.type = 'audio/mpeg';
             originalAudio.appendChild(originalSrc);
+            setupAudioElement(originalAudio, 'vocal-orig-' + file.id);
             originalBox.appendChild(originalLabel);
             originalBox.appendChild(originalAudio);
             originalRow.appendChild(originalBox);
@@ -497,6 +574,7 @@ async function refreshVocalFilesList() {
                 vocalsSrc.src = file.vocals_url;
                 vocalsSrc.type = 'audio/mpeg';
                 vocalsAudio.appendChild(vocalsSrc);
+                setupAudioElement(vocalsAudio, 'vocal-vocals-' + file.id);
                 vocalsBox.appendChild(vocalsLabel);
                 vocalsBox.appendChild(vocalsAudio);
             } else if (file.status === 'processing') {
@@ -554,6 +632,7 @@ async function refreshVocalFilesList() {
                 instrumentalSrc.src = file.instrumental_url;
                 instrumentalSrc.type = 'audio/mpeg';
                 instrumentalAudio.appendChild(instrumentalSrc);
+                setupAudioElement(instrumentalAudio, 'vocal-instrumental-' + file.id);
                 instrumentalBox.appendChild(instrumentalLabel);
                 instrumentalBox.appendChild(instrumentalAudio);
             } else if (file.status === 'processing') {
@@ -611,6 +690,11 @@ function startVocalPolling() {
     if (vocalPollingInterval) return;
     
     vocalPollingInterval = setInterval(async () => {
+        if (isAnyAudioPlaying()) {
+            console.log('Skipping vocal refresh - audio playing');
+            return;
+        }
+        
         const resp = await fetch('/api/vocal/files/', { credentials: 'same-origin' });
         if (resp.ok) {
             const data = await resp.json();
@@ -623,47 +707,21 @@ function startVocalPolling() {
             
             refreshVocalFilesList();
         }
-    }, 3000);
+    }, 10000);
 }
 
 // Delete vocal file
 function deleteVocalFile(fileId, filename) {
-    deleteVocalFileId = fileId;
-    deleteVocalFileName = filename;
+    console.log('[DELETE] Vocal file clicked:', fileId, filename);
+    window.deleteVocalFileId = fileId;
+    window.deleteVocalFileName = filename;
     document.getElementById('delete-file-name').textContent = filename;
-    document.getElementById('delete-file-modal').classList.add('active');
-}
-
-async function confirmDeleteVocalFile() {
-    if (!deleteVocalFileId) return;
-    
-    try {
-        const resp = await fetch(`/api/vocal/files/${deleteVocalFileId}/delete/`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            credentials: 'same-origin'
-        });
-        
-        if (!resp.ok) {
-            const error = await resp.json();
-            throw new Error(error.error || 'Failed to delete file');
-        }
-        
-        closeDeleteFileModal();
-        await refreshVocalFilesList();
-        
-    } catch (e) {
-        closeDeleteFileModal();
-        const statusDiv = document.getElementById('vocal-upload-status');
-        statusDiv.textContent = '❌ Error deleting file: ' + e.message;
-        statusDiv.style.color = '#991b1b';
-        setTimeout(() => {
-            statusDiv.textContent = '';
-        }, 5000);
-        console.error('Delete error:', e);
-    }
+    document.getElementById('delete-file-warning').innerHTML = '⚠️ This will permanently delete the original, vocals, and instrumental files.';
+    const modal = document.getElementById('delete-file-modal');
+    console.log('[DELETE] Modal before add active:', modal.className, 'display:', modal.style.display);
+    modal.style.display = ''; // Remove inline style so CSS class can work
+    modal.classList.add('active');
+    console.log('[DELETE] Modal after add active:', modal.className, 'display:', modal.style.display);
 }
 
 // Update confirmDeleteFile to handle both denoise and vocal files
@@ -863,6 +921,7 @@ window.refreshDenoiseFilesList = async function refreshDenoiseFilesList() {
             originalSrc.src = file.original_file_url;
             originalSrc.type = 'audio/mpeg';
             originalAudio.appendChild(originalSrc);
+            setupAudioElement(originalAudio, 'denoise-orig-' + file.id);
             
             originalBox.appendChild(originalLabel);
             originalBox.appendChild(originalAudio);
@@ -896,6 +955,7 @@ window.refreshDenoiseFilesList = async function refreshDenoiseFilesList() {
                 denoisedSrc.src = file.denoised_file_url;
                 denoisedSrc.type = 'audio/mpeg';
                 denoisedAudio.appendChild(denoisedSrc);
+                setupAudioElement(denoisedAudio, 'denoise-denoised-' + file.id);
                 denoisedBox.appendChild(denoisedLabel);
                 denoisedBox.appendChild(denoisedAudio);
             } else if (file.status === 'processing') {
@@ -1283,55 +1343,13 @@ async function renderWaveform(audioUrl, canvas, color) {
 }
 
 function deleteDenoiseFile(fileId, filename) {
-    deleteDenoiseFileId = fileId;
-    deleteDenoiseFileName = filename;
+    window.deleteDenoiseFileId = fileId;
+    window.deleteDenoiseFileName = filename;
     document.getElementById('delete-file-name').textContent = filename;
-    document.getElementById('delete-file-modal').classList.add('active');
-}
-
-async function confirmDeleteDenoiseFile() {
-    if (!deleteDenoiseFileId) return;
-    
-    try {
-        const resp = await fetch(`/api/denoise/files/${deleteDenoiseFileId}/delete/`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            credentials: 'same-origin'
-        });
-        
-        if (!resp.ok) {
-            const error = await resp.json();
-            throw new Error(error.error || 'Failed to delete file');
-        }
-        
-        closeDeleteFileModal();
-        await refreshDenoiseFilesList();
-        
-    } catch (e) {
-        closeDeleteFileModal();
-        const statusDiv = document.getElementById('upload-status');
-        statusDiv.textContent = '❌ Error deleting file: ' + e.message;
-        statusDiv.style.color = '#991b1b';
-        setTimeout(() => {
-            statusDiv.textContent = '';
-        }, 5000);
-        console.error('Delete error:', e);
-    }
-}
-
-// Update the confirm delete function to handle all file types
-if (typeof window.confirmDeleteFile === 'undefined') {
-    window.confirmDeleteFile = function() {
-        if (deleteVocalFileId) {
-            confirmDeleteVocalFile();
-        } else if (deleteDenoiseFileId) {
-            confirmDeleteDenoiseFile();
-        } else if (deleteBoostFileId) {
-            confirmDeleteBoostFile();
-        }
-    };
+    document.getElementById('delete-file-warning').innerHTML = '⚠️ This will permanently delete both the original and denoised files.';
+    const modal = document.getElementById('delete-file-modal');
+    modal.style.display = ''; // Remove inline style so CSS class can work
+    modal.classList.add('active');
 }
 
 // ===== AUDIO BOOST TAB FUNCTIONS =====
@@ -1550,6 +1568,7 @@ async function refreshBoostFilesList() {
             originalSrc.src = file.original_file_url;
             originalSrc.type = 'audio/mpeg';
             originalAudio.appendChild(originalSrc);
+            setupAudioElement(originalAudio, 'boost-orig-' + file.id);
             originalBox.appendChild(originalLabel);
             originalBox.appendChild(originalAudio);
             originalRow.appendChild(originalBox);
@@ -1577,6 +1596,7 @@ async function refreshBoostFilesList() {
                 boostedSrc.src = file.boosted_file_url;
                 boostedSrc.type = 'audio/mpeg';
                 boostedAudio.appendChild(boostedSrc);
+                setupAudioElement(boostedAudio, 'boost-boosted-' + file.id);
                 boostedBox.appendChild(boostedLabel);
                 boostedBox.appendChild(boostedAudio);
             } else if (file.status === 'processing') {
@@ -1629,42 +1649,13 @@ async function refreshBoostFilesList() {
 }
 
 function deleteBoostFile(fileId, filename) {
-    deleteBoostFileId = fileId;
-    deleteBoostFileName = filename;
+    window.deleteBoostFileId = fileId;
+    window.deleteBoostFileName = filename;
     document.getElementById('delete-file-name').textContent = filename;
-    document.getElementById('delete-file-modal').classList.add('active');
-}
-
-async function confirmDeleteBoostFile() {
-    if (!deleteBoostFileId) return;
-    
-    try {
-        const resp = await fetch(`/api/boost/files/${deleteBoostFileId}/delete/`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            credentials: 'same-origin'
-        });
-        
-        if (!resp.ok) {
-            const error = await resp.json();
-            throw new Error(error.error || 'Failed to delete file');
-        }
-        
-        closeDeleteFileModal();
-        await refreshBoostFilesList();
-        
-    } catch (e) {
-        closeDeleteFileModal();
-        const statusDiv = document.getElementById('boost-upload-status');
-        statusDiv.textContent = '❌ Error deleting file: ' + e.message;
-        statusDiv.style.color = '#991b1b';
-        setTimeout(() => {
-            statusDiv.textContent = '';
-        }, 5000);
-        console.error('Delete error:', e);
-    }
+    document.getElementById('delete-file-warning').innerHTML = '⚠️ This will permanently delete both the original and boosted files.';
+    const modal = document.getElementById('delete-file-modal');
+    modal.style.display = ''; // Remove inline style so CSS class can work
+    modal.classList.add('active');
 }
 
 // Polling for processing files
@@ -1680,8 +1671,13 @@ function startBoostPolling() {
             return;
         }
         
+        if (isAnyAudioPlaying()) {
+            console.log('Skipping boost refresh - audio playing');
+            return;
+        }
+        
         await refreshBoostFilesList();
-    }, 3000);
+    }, 10000);
 }
 
 function stopBoostPolling() {
@@ -1692,8 +1688,6 @@ function stopBoostPolling() {
 }
 
 // ===== SPEAKER EXTRACTION TAB =====
-let deleteSpeakerFileId = null;
-let deleteSpeakerFileName = '';
 
 window.handleSpeakerBoostContainerClick = function(event) {
     const slider = document.getElementById('speaker-boost-level');
@@ -1941,6 +1935,7 @@ async function refreshSpeakerFilesList() {
             convSrc.src = file.conversation_url;
             convSrc.type = 'audio/mpeg';
             convAudio.appendChild(convSrc);
+            setupAudioElement(convAudio, 'speaker-conv-' + file.id);
             
             convBox.appendChild(convLabel);
             convBox.appendChild(convAudio);
@@ -1964,6 +1959,7 @@ async function refreshSpeakerFilesList() {
             targetSrc.src = file.target_url;
             targetSrc.type = 'audio/mpeg';
             targetAudio.appendChild(targetSrc);
+            setupAudioElement(targetAudio, 'speaker-target-' + file.id);
             
             targetBox.appendChild(targetLabel);
             targetBox.appendChild(targetAudio);
@@ -1994,6 +1990,7 @@ async function refreshSpeakerFilesList() {
                 extractedSrc.src = file.extracted_url;
                 extractedSrc.type = 'audio/mpeg';
                 extractedAudio.appendChild(extractedSrc);
+                setupAudioElement(extractedAudio, 'speaker-extracted-' + file.id);
                 
                 extractedBox.appendChild(extractedLabel);
                 extractedBox.appendChild(extractedAudio);
@@ -2038,51 +2035,14 @@ async function refreshSpeakerFilesList() {
 }
 
 window.deleteSpeakerFile = function(fileId, filename) {
-    deleteSpeakerFileId = fileId;
-    deleteSpeakerFileName = filename;
+    window.deleteSpeakerFileId = fileId;
+    window.deleteSpeakerFileName = filename;
     
+    document.getElementById('delete-file-name').textContent = filename;
+    document.getElementById('delete-file-warning').innerHTML = '⚠️ This will permanently delete the conversation audio, target sample, and extracted voice files.';
     const modal = document.getElementById('delete-file-modal');
-    const fileNameSpan = document.getElementById('delete-file-name');
-    
-    if (modal && fileNameSpan) {
-        fileNameSpan.textContent = filename;
-        modal.classList.add('active');
-    }
-};
-
-async function confirmDeleteSpeakerFile() {
-    if (!deleteSpeakerFileId) return;
-    
-    try {
-        const response = await fetch(`/api/speaker/files/${deleteSpeakerFileId}/delete/`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
-        });
-        
-        if (response.ok) {
-            await refreshSpeakerFilesList();
-        } else {
-            console.error('Failed to delete file');
-        }
-    } catch (error) {
-        console.error('Error deleting file:', error);
-    }
-    
-    deleteSpeakerFileId = null;
-    deleteSpeakerFileName = '';
-    closeDeleteFileModal();
-}
-
-// Update confirmDeleteFile to handle speaker files
-const originalConfirmDeleteFile = window.confirmDeleteFile;
-window.confirmDeleteFile = function() {
-    if (deleteSpeakerFileId) {
-        confirmDeleteSpeakerFile();
-    } else {
-        originalConfirmDeleteFile();
-    }
+    modal.style.display = ''; // Remove inline style so CSS class can work
+    modal.classList.add('active');
 };
 
 // Polling for speaker extraction status updates
@@ -2098,8 +2058,13 @@ function startSpeakerPolling() {
             return;
         }
         
+        if (isAnyAudioPlaying()) {
+            console.log('Skipping speaker refresh - audio playing');
+            return;
+        }
+        
         await refreshSpeakerFilesList();
-    }, 3000);
+    }, 10000);
 }
 
 function stopSpeakerPolling() {
@@ -2108,3 +2073,355 @@ function stopSpeakerPolling() {
         speakerPollingInterval = null;
     }
 }
+
+
+// ===== VOICE CLONE HANDLERS =====
+
+let voiceClonePollingInterval = null;
+
+// File input handlers
+function clearVoiceCloneSourceInput(e) {
+    e.stopPropagation();
+    const input = document.getElementById('voiceclone-source-input');
+    input.value = '';
+    document.getElementById('voiceclone-source-main').textContent = 'Source audio';
+    document.getElementById('voiceclone-source-sub').textContent = 'Content to convert';
+    document.getElementById('voiceclone-source-clear').style.display = 'none';
+}
+
+function clearVoiceCloneTargetInput(e) {
+    e.stopPropagation();
+    const input = document.getElementById('voiceclone-target-input');
+    input.value = '';
+    document.getElementById('voiceclone-target-main').textContent = 'Target voice sample';
+    document.getElementById('voiceclone-target-sub').textContent = 'Voice to clone';
+    document.getElementById('voiceclone-target-clear').style.display = 'none';
+}
+
+window.clearVoiceCloneSourceInput = clearVoiceCloneSourceInput;
+window.clearVoiceCloneTargetInput = clearVoiceCloneTargetInput;
+
+// Setup event listeners
+(function() {
+    const voiceCloneForm = document.getElementById('voiceclone-upload-form');
+    if (voiceCloneForm) {
+        voiceCloneForm.addEventListener('submit', handleVoiceCloneUpload);
+    }
+    
+    const sourceInput = document.getElementById('voiceclone-source-input');
+    if (sourceInput) {
+        sourceInput.addEventListener('change', function() {
+            if (this.files[0]) {
+                document.getElementById('voiceclone-source-main').textContent = this.files[0].name;
+                document.getElementById('voiceclone-source-sub').textContent = '';
+                document.getElementById('voiceclone-source-clear').style.display = 'block';
+            }
+        });
+    }
+    
+    const targetInput = document.getElementById('voiceclone-target-input');
+    if (targetInput) {
+        targetInput.addEventListener('change', function() {
+            if (this.files[0]) {
+                document.getElementById('voiceclone-target-main').textContent = this.files[0].name;
+                document.getElementById('voiceclone-target-sub').textContent = '';
+                document.getElementById('voiceclone-target-clear').style.display = 'block';
+            }
+        });
+    }
+})();
+
+async function handleVoiceCloneUpload(e) {
+    e.preventDefault();
+    
+    const sourceInput = document.getElementById('voiceclone-source-input');
+    const targetInput = document.getElementById('voiceclone-target-input');
+    const statusDiv = document.getElementById('voiceclone-upload-status');
+    
+    const sourceFile = sourceInput.files[0];
+    const targetFile = targetInput.files[0];
+    
+    if (!sourceFile || !targetFile) {
+        statusDiv.textContent = 'Please select both source and target voice files';
+        statusDiv.style.color = '#ef4444';
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('source_file', sourceFile);
+    formData.append('target_voice_file', targetFile);
+    
+    statusDiv.textContent = 'Uploading...';
+    statusDiv.style.color = '#6b7280';
+    
+    try {
+        const response = await fetch('/api/voiceclone/convert/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            statusDiv.textContent = 'Upload successful! Processing voice cloning...';
+            statusDiv.style.color = '#10b981';
+            
+            // Clear form
+            clearVoiceCloneSourceInput(new Event('click'));
+            clearVoiceCloneTargetInput(new Event('click'));
+            
+            // Refresh list
+            await refreshVoiceCloneFilesList();
+            startVoiceClonePolling();
+            
+            setTimeout(() => {
+                statusDiv.textContent = '';
+            }, 3000);
+        } else {
+            statusDiv.textContent = data.error || 'Upload failed';
+            statusDiv.style.color = '#ef4444';
+        }
+    } catch (error) {
+        statusDiv.textContent = 'Error uploading files';
+        statusDiv.style.color = '#ef4444';
+    }
+}
+
+async function refreshVoiceCloneFilesList() {
+    const list = document.getElementById('voiceclone-files-list');
+    if (!list) return;
+    
+    try {
+        const response = await fetch('/api/voiceclone/files/', {
+            credentials: 'same-origin'
+        });
+        
+        if (!response.ok) {
+            list.innerHTML = '<div class="empty" style="color: #991b1b;">Error loading files</div>';
+            return;
+        }
+        
+        const data = await response.json();
+        const files = data.files || [];
+        
+        if (files.length === 0) {
+            list.innerHTML = '<div class="empty">No files yet</div>';
+            return;
+        }
+        
+        list.innerHTML = '';
+        files.forEach(file => {
+            const item = document.createElement('div');
+            item.className = 'recording-item';
+            item.style.flexDirection = 'column';
+            item.style.alignItems = 'stretch';
+            item.style.gap = '0.5rem';
+            item.style.padding = '0.65rem';
+            
+            const header = document.createElement('div');
+            header.style.width = '100%';
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
+            header.style.marginBottom = '0.35rem';
+            
+            const leftHeader = document.createElement('div');
+            leftHeader.style.display = 'flex';
+            leftHeader.style.flexDirection = 'column';
+            leftHeader.style.gap = '0.15rem';
+            leftHeader.style.flex = '1';
+            
+            const fileName = document.createElement('div');
+            fileName.className = 'recording-title';
+            fileName.style.fontSize = '0.9rem';
+            fileName.textContent = file.source_filename;
+            
+            const uploadDate = document.createElement('div');
+            uploadDate.className = 'muted';
+            uploadDate.style.fontSize = '0.75rem';
+            uploadDate.textContent = new Date(file.uploaded_at).toLocaleString();
+            
+            leftHeader.appendChild(fileName);
+            leftHeader.appendChild(uploadDate);
+            
+            // Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-delete-file';
+            deleteBtn.textContent = '❌';
+            deleteBtn.onclick = () => deleteVoiceCloneFile(file.id, file.source_filename);
+            
+            header.appendChild(leftHeader);
+            header.appendChild(deleteBtn);
+            
+            // Source and Target row (side by side)
+            const inputsRow = document.createElement('div');
+            inputsRow.style.display = 'flex';
+            inputsRow.style.gap = '0.75rem';
+            inputsRow.style.flexWrap = 'wrap';
+            inputsRow.style.width = '100%';
+            inputsRow.style.marginBottom = '0.5rem';
+            
+            // Source audio
+            const sourceBox = document.createElement('div');
+            sourceBox.style.flex = '1 1 250px';
+            sourceBox.style.minWidth = '250px';
+            const sourceLabel = document.createElement('div');
+            sourceLabel.className = 'muted';
+            sourceLabel.style.fontSize = '0.75rem';
+            sourceLabel.style.marginBottom = '0.2rem';
+            sourceLabel.textContent = '📁 Source Audio (Content)';
+            const sourceAudio = document.createElement('audio');
+            sourceAudio.controls = true;
+            sourceAudio.preload = 'none';
+            sourceAudio.style.width = '100%';
+            sourceAudio.style.height = '32px';
+            const sourceSrc = document.createElement('source');
+            sourceSrc.src = file.source_url;
+            sourceSrc.type = 'audio/mpeg';
+            sourceAudio.appendChild(sourceSrc);
+            setupAudioElement(sourceAudio, 'voiceclone-source-' + file.id);
+            sourceBox.appendChild(sourceLabel);
+            sourceBox.appendChild(sourceAudio);
+            
+            // Target voice file
+            const targetBox = document.createElement('div');
+            targetBox.style.flex = '1 1 250px';
+            targetBox.style.minWidth = '250px';
+            const targetLabel = document.createElement('div');
+            targetLabel.className = 'muted';
+            targetLabel.style.fontSize = '0.75rem';
+            targetLabel.style.marginBottom = '0.2rem';
+            targetLabel.textContent = '🎤 Target Voice (' + file.target_voice_filename + ')';
+            
+            const targetAudio = document.createElement('audio');
+            targetAudio.controls = true;
+            targetAudio.preload = 'none';
+            targetAudio.style.width = '100%';
+            targetAudio.style.height = '32px';
+            const targetSrc = document.createElement('source');
+            targetSrc.src = file.target_voice_url;
+            targetSrc.type = 'audio/mpeg';
+            targetAudio.appendChild(targetSrc);
+            setupAudioElement(targetAudio, 'voiceclone-target-' + file.id);
+            targetBox.appendChild(targetLabel);
+            targetBox.appendChild(targetAudio);
+            
+            inputsRow.appendChild(sourceBox);
+            inputsRow.appendChild(targetBox);
+            
+            // Cloned voice result row (full width)
+            const resultRow = document.createElement('div');
+            resultRow.style.display = 'flex';
+            resultRow.style.width = '100%';
+            
+            const convertedBox = document.createElement('div');
+            convertedBox.style.flex = '1';
+            const convertedLabel = document.createElement('div');
+            convertedLabel.className = 'muted';
+            convertedLabel.style.fontSize = '0.75rem';
+            convertedLabel.style.marginBottom = '0.2rem';
+            convertedLabel.textContent = '🎭 Cloned Voice';
+            
+            if (file.status === 'completed' && file.converted_url) {
+                const convertedAudio = document.createElement('audio');
+                convertedAudio.controls = true;
+                convertedAudio.preload = 'none';
+                convertedAudio.style.width = '100%';
+                convertedAudio.style.height = '32px';
+                const convertedSrc = document.createElement('source');
+                convertedSrc.src = file.converted_url;
+                convertedSrc.type = 'audio/mpeg';
+                convertedAudio.appendChild(convertedSrc);
+                setupAudioElement(convertedAudio, 'voiceclone-converted-' + file.id);
+                convertedBox.appendChild(convertedLabel);
+                convertedBox.appendChild(convertedAudio);
+            } else if (file.status === 'processing') {
+                const processingMsg = document.createElement('div');
+                processingMsg.style.padding = '0.4rem';
+                processingMsg.style.background = '#fef3c7';
+                processingMsg.style.color = '#92400e';
+                processingMsg.style.borderRadius = '6px';
+                processingMsg.style.fontSize = '0.8rem';
+                processingMsg.textContent = '⏳ Processing...';
+                convertedBox.appendChild(convertedLabel);
+                convertedBox.appendChild(processingMsg);
+            } else if (file.status === 'failed') {
+                const errorMsg = document.createElement('div');
+                errorMsg.style.padding = '0.4rem';
+                errorMsg.style.background = '#fee2e2';
+                errorMsg.style.color = '#991b1b';
+                errorMsg.style.borderRadius = '6px';
+                errorMsg.style.fontSize = '0.8rem';
+                errorMsg.textContent = '❌ Failed';
+                if (file.error_message) {
+                    errorMsg.title = file.error_message;
+                }
+                convertedBox.appendChild(convertedLabel);
+                convertedBox.appendChild(errorMsg);
+            } else {
+                const pendingMsg = document.createElement('div');
+                pendingMsg.style.padding = '0.4rem';
+                pendingMsg.style.background = '#e0e7ff';
+                pendingMsg.style.color = '#3730a3';
+                pendingMsg.style.borderRadius = '6px';
+                pendingMsg.style.fontSize = '0.8rem';
+                pendingMsg.textContent = '⏱️ Pending...';
+                convertedBox.appendChild(convertedLabel);
+                convertedBox.appendChild(pendingMsg);
+            }
+            
+            resultRow.appendChild(convertedBox);
+            
+            item.appendChild(header);
+            item.appendChild(inputsRow);
+            item.appendChild(resultRow);
+            list.appendChild(item);
+        });
+        
+    } catch (error) {
+        console.error('Error refreshing voice clone files:', error);
+        list.innerHTML = '<div class="empty" style="color: #991b1b;">Error loading files</div>';
+    }
+}
+
+async function deleteVoiceCloneFile(fileId, filename) {
+    window.deleteVoiceCloneFileId = fileId;
+    window.deleteVoiceCloneFileName = filename;
+    
+    document.getElementById('delete-file-name').textContent = filename;
+    document.getElementById('delete-file-warning').innerHTML = '⚠️ This will permanently delete the source audio, target voice, and cloned voice files.';
+    const modal = document.getElementById('delete-file-modal');
+    modal.style.display = ''; // Remove inline style so CSS class can work
+    modal.classList.add('active');
+}
+
+function startVoiceClonePolling() {
+    if (voiceClonePollingInterval) return;
+    
+    voiceClonePollingInterval = setInterval(async () => {
+        const list = document.getElementById('voiceclone-files-list');
+        if (!list || !document.getElementById('voiceclone-tab-content').classList.contains('active')) {
+            stopVoiceClonePolling();
+            return;
+        }
+        
+        if (isAnyAudioPlaying()) {
+            console.log('Skipping voice clone refresh - audio playing');
+            return;
+        }
+        
+        await refreshVoiceCloneFilesList();
+    }, 10000);
+}
+
+function stopVoiceClonePolling() {
+    if (voiceClonePollingInterval) {
+        clearInterval(voiceClonePollingInterval);
+        voiceClonePollingInterval = null;
+    }
+}
+
+window.refreshVoiceCloneFilesList = refreshVoiceCloneFilesList;

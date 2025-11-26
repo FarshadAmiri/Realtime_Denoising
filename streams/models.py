@@ -165,3 +165,30 @@ class SpeakerExtractionFile(models.Model):
     
     def __str__(self):
         return f"{self.owner.username} - {self.original_filename} ({self.status})"
+
+
+class VoiceCloneFile(models.Model):
+    """Stores user-uploaded audio files for voice cloning/conversion."""
+    PROCESSING_STATUS = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='voice_clone_files')
+    source_filename = models.CharField(max_length=255)
+    target_voice_filename = models.CharField(max_length=255)
+    source_file = models.FileField(upload_to='uploads/voice_clone/source/')
+    target_voice_file = models.FileField(upload_to='uploads/voice_clone/target/')
+    converted_file = models.FileField(upload_to='uploads/voice_clone/converted/', null=True, blank=True)
+    status = models.CharField(max_length=20, choices=PROCESSING_STATUS, default='pending')
+    error_message = models.TextField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-uploaded_at']
+    
+    def __str__(self):
+        return f"{self.owner.username} - {self.source_filename} ({self.status})"

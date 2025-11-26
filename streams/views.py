@@ -791,3 +791,103 @@ def delete_speaker_extraction_file(request, file_id):
     extraction_file.delete()
     
     return Response({'message': 'File deleted successfully'}, status=200)
+
+
+# ==================== VOICE CLONE API VIEWS ====================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_voice_clone(request):
+    """Upload audio files for voice cloning/conversion."""
+    if 'source_file' not in request.FILES or 'target_voice_file' not in request.FILES:
+        return Response({'error': 'Both source and target voice files are required'}, status=400)
+    
+    source_file = request.FILES['source_file']
+    target_voice_file = request.FILES['target_voice_file']
+    
+    # Validate file types
+    allowed_extensions = ['.wav', '.mp3', '.flac', '.ogg', '.m4a']
+    if not any(source_file.name.lower().endswith(ext) for ext in allowed_extensions):
+        return Response({'error': 'Invalid source file type'}, status=400)
+    if not any(target_voice_file.name.lower().endswith(ext) for ext in allowed_extensions):
+        return Response({'error': 'Invalid target voice file type'}, status=400)
+    
+    from .models import VoiceCloneFile
+    
+    # Create database entry
+    clone_file = VoiceCloneFile.objects.create(
+        owner=request.user,
+        source_filename=source_file.name,
+        target_voice_filename=target_voice_file.name,
+        source_file=source_file,
+        target_voice_file=target_voice_file,
+        status='pending'
+    )
+    
+    # Start processing in background thread
+    import threading
+    from .voice_clone_processor import process_voice_clone
+    
+    thread = threading.Thread(target=process_voice_clone, args=(clone_file.id,))
+    thread.daemon = True
+    thread.start()
+    
+    return Response({
+        'id': clone_file.id,
+        'source_filename': clone_file.source_filename,
+        'target_voice_filename': clone_file.target_voice_filename,
+        'status': clone_file.status,
+        'uploaded_at': clone_file.uploaded_at.isoformat()
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_voice_clone_files(request):
+    """Get list of voice clone files for the current user."""
+    from .models import VoiceCloneFile
+    
+    files = VoiceCloneFile.objects.filter(owner=request.user)
+    
+    data = []
+    for f in files:
+        data.append({
+            'id': f.id,
+            'source_filename': f.source_filename,
+            'target_voice_filename': f.target_voice_filename,
+            'source_url': f.source_file.url if f.source_file else None,
+            'target_voice_url': f.target_voice_file.url if f.target_voice_file else None,
+            'converted_url': f.converted_file.url if f.converted_file else None,
+            'status': f.status,
+            'error_message': f.error_message,
+            'uploaded_at': f.uploaded_at.isoformat(),
+            'processed_at': f.processed_at.isoformat() if f.processed_at else None
+        })
+    
+    return Response({'files': data})
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_voice_clone_file(request, file_id):
+    """Delete a voice clone file."""
+    from .models import VoiceCloneFile
+    
+    try:
+        clone_file = VoiceCloneFile.objects.get(id=file_id, owner=request.user)
+    except VoiceCloneFile.DoesNotExist:
+        return Response({'error': 'File not found'}, status=404)
+    
+    # Delete physical files from storage
+    for field in ['source_file', 'target_voice_file', 'converted_file']:
+        try:
+            file_field = getattr(clone_file, field)
+            if file_field and file_field.storage.exists(file_field.name):
+                file_field.delete(save=False)
+        except Exception as e:
+            print(f"Error deleting {field}: {e}")
+    
+    # Delete database record
+    clone_file.delete()
+    
+    return Response({'message': 'File deleted successfully'}, status=200)

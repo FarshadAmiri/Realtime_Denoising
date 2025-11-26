@@ -1519,20 +1519,84 @@ function deleteDenoiseFile(fileId, filename) {
     deleteFileId = fileId;
     deleteFileName = filename;
     document.getElementById('delete-file-name').textContent = filename;
-    document.getElementById('delete-file-modal').classList.add('active');
+    const modal = document.getElementById('delete-file-modal');
+    modal.style.display = ''; // Remove inline style so CSS class can work
+    modal.classList.add('active');
 }
 
 function closeDeleteFileModal() {
-    document.getElementById('delete-file-modal').classList.remove('active');
+    console.log('[DELETE] Closing modal');
+    const modal = document.getElementById('delete-file-modal');
+    console.log('[DELETE] Modal before remove active:', modal.className);
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+    console.log('[DELETE] Modal after remove active:', modal.className);
+    
+    // Clear all file IDs
     deleteFileId = null;
     deleteFileName = null;
+    
+    // Clear modal-tabs-new.js variables if they exist
+    if (typeof window.deleteDenoiseFileId !== 'undefined') window.deleteDenoiseFileId = null;
+    if (typeof window.deleteDenoiseFileName !== 'undefined') window.deleteDenoiseFileName = '';
+    if (typeof window.deleteVocalFileId !== 'undefined') window.deleteVocalFileId = null;
+    if (typeof window.deleteVocalFileName !== 'undefined') window.deleteVocalFileName = '';
+    if (typeof window.deleteBoostFileId !== 'undefined') window.deleteBoostFileId = null;
+    if (typeof window.deleteBoostFileName !== 'undefined') window.deleteBoostFileName = '';
+    if (typeof window.deleteSpeakerFileId !== 'undefined') window.deleteSpeakerFileId = null;
+    if (typeof window.deleteSpeakerFileName !== 'undefined') window.deleteSpeakerFileName = '';
+    if (typeof window.deleteVoiceCloneFileId !== 'undefined') window.deleteVoiceCloneFileId = null;
+    if (typeof window.deleteVoiceCloneFileName !== 'undefined') window.deleteVoiceCloneFileName = '';
+    console.log('[DELETE] All variables cleared');
 }
 
 async function confirmDeleteFile() {
-    if (!deleteFileId) return;
+    console.log('[DELETE] Confirm delete called');
+    let fileId = null;
+    let deleteUrl = null;
+    let refreshFunction = null;
+    
+    console.log('[DELETE] Checking variables:', {
+        denoise: window.deleteDenoiseFileId,
+        vocal: window.deleteVocalFileId,
+        boost: window.deleteBoostFileId,
+        speaker: window.deleteSpeakerFileId,
+        voiceclone: window.deleteVoiceCloneFileId,
+        fallback: deleteFileId
+    });
+    
+    // Determine which file type is being deleted
+    if (window.deleteDenoiseFileId) {
+        fileId = window.deleteDenoiseFileId;
+        deleteUrl = `/api/denoise/files/${fileId}/delete/`;
+        refreshFunction = window.refreshDenoiseFilesList;
+    } else if (window.deleteVocalFileId) {
+        fileId = window.deleteVocalFileId;
+        deleteUrl = `/api/vocal/files/${fileId}/delete/`;
+        refreshFunction = window.refreshVocalFilesList;
+    } else if (window.deleteBoostFileId) {
+        fileId = window.deleteBoostFileId;
+        deleteUrl = `/api/boost/files/${fileId}/delete/`;
+        refreshFunction = window.refreshBoostFilesList;
+    } else if (window.deleteSpeakerFileId) {
+        fileId = window.deleteSpeakerFileId;
+        deleteUrl = `/api/speaker/files/${fileId}/delete/`;
+        refreshFunction = window.refreshSpeakerFilesList;
+    } else if (window.deleteVoiceCloneFileId) {
+        fileId = window.deleteVoiceCloneFileId;
+        deleteUrl = `/api/voiceclone/files/${fileId}/delete/`;
+        refreshFunction = window.refreshVoiceCloneFilesList;
+    } else if (deleteFileId) {
+        // Fallback for old denoise delete
+        fileId = deleteFileId;
+        deleteUrl = `/api/denoise/files/${fileId}/delete/`;
+        refreshFunction = window.refreshDenoiseFilesList;
+    }
+    
+    if (!fileId) return;
     
     try {
-        const resp = await fetch(`/api/denoise/files/${deleteFileId}/delete/`, {
+        const resp = await fetch(deleteUrl, {
             method: 'DELETE',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken')
@@ -1548,18 +1612,22 @@ async function confirmDeleteFile() {
         // Close modal
         closeDeleteFileModal();
         
-        // Refresh the list
-        await refreshDenoiseFilesList();
+        // Refresh the appropriate list
+        if (refreshFunction) {
+            await refreshFunction();
+        }
         
     } catch (e) {
         closeDeleteFileModal();
         // Show error in a nicer way
         const statusDiv = document.getElementById('upload-status');
-        statusDiv.textContent = '❌ Error deleting file: ' + e.message;
-        statusDiv.style.color = '#991b1b';
-        setTimeout(() => {
-            statusDiv.textContent = '';
-        }, 5000);
+        if (statusDiv) {
+            statusDiv.textContent = '❌ Error deleting file: ' + e.message;
+            statusDiv.style.color = '#991b1b';
+            setTimeout(() => {
+                statusDiv.textContent = '';
+            }, 5000);
+        }
         console.error('Delete error:', e);
     }
 }

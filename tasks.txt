@@ -1,5 +1,3 @@
 * Add voice personage changer
 
-* Add sound bars and lines to file denoise
-
 * Implement Diarization with person's voice detector (Nvidia Nemo or ...)
