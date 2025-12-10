@@ -1,0 +1,74 @@
+[
+  {
+    "start": 0.75,
+    "end": 18.0,
+    "speaker": "sp3000",
+    "identified": true
+  },
+  {
+    "start": 18.0,
+    "end": 18.75,
+    "speaker": "Speaker_5",
+    "identified": false
+  },
+  {
+    "start": 18.75,
+    "end": 30.0,
+    "speaker": "sp422",
+    "identified": true
+  },
+  {
+    "start": 30.0,
+    "end": 30.75,
+    "speaker": "Speaker_7",
+    "identified": false
+  },
+  {
+    "start": 30.75,
+    "end": 36.0,
+    "speaker": "sp422",
+    "identified": true
+  },
+  {
+    "start": 36.0,
+    "end": 37.5,
+    "speaker": "sp777",
+    "identified": true
+  },
+  {
+    "start": 37.5,
+    "end": 40.5,
+    "speaker": "sp777",
+    "identified": true
+  },
+  {
+    "start": 40.5,
+    "end": 52.5,
+    "speaker": "sp3000",
+    "identified": true
+  },
+  {
+    "start": 52.5,
+    "end": 54.0,
+    "speaker": "sp3000",
+    "identified": true
+  },
+  {
+    "start": 54.0,
+    "end": 63.0,
+    "speaker": "sp3000",
+    "identified": true
+  },
+  {
+    "start": 63.0,
+    "end": 74.25,
+    "speaker": "sp777",
+    "identified": true
+  },
+  {
+    "start": 74.25,
+    "end": 84.75,
+    "speaker": "sp1993",
+    "identified": true
+  }
+]

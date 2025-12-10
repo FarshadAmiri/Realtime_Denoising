@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Optional, Dict, List
 import json
 
-from .voice_enrollment import VoiceEnrollment
-from .diarization_processor import DiarizationProcessor
-from .transcription import TranscriptionProcessor
+from voice_enrollment import VoiceEnrollment
+from diarization_processor import DiarizationProcessor
+from transcription import TranscriptionProcessor
 
 
 def process_meeting_audio(

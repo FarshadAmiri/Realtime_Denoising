@@ -29,13 +29,26 @@ class DiarizationProcessor:
         self.device = device
         print(f"Using device: {self.device}")
         
+        # Set up HuggingFace token if available
+        hf_token_path = Path("hf_token.txt")
+        if hf_token_path.exists():
+            with open(hf_token_path, 'r') as f:
+                token = f.read().strip()
+                os.environ['HF_TOKEN'] = token
+                os.environ['HUGGING_FACE_HUB_TOKEN'] = token
+        
         # Load SpeechBrain speaker recognition model
         print("Loading SpeechBrain models...")
-        self.speaker_model = EncoderClassifier.from_hparams(
-            source="speechbrain/spkrec-ecapa-voxceleb",
-            savedir="Nemo-diarization/models/spkrec-ecapa-voxceleb",
-            run_opts={"device": device}
-        )
+        try:
+            self.speaker_model = EncoderClassifier.from_hparams(
+                source="speechbrain/spkrec-ecapa-voxceleb",
+                savedir="Nemo-diarization/models/spkrec-ecapa-voxceleb",
+                run_opts={"device": device}
+            )
+        except Exception as e:
+            print(f"Warning: Could not load SpeechBrain model: {e}")
+            print("Continuing with Resemblyzer only...")
+            self.speaker_model = None
         
         # Load Resemblyzer for embeddings
         self.encoder = VoiceEncoder(device=device)
