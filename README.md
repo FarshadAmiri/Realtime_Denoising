@@ -46,6 +46,14 @@ ClearCast provides a comprehensive suite of audio processing tools accessible vi
    - Automatic recording of all streams
    - Presence tracking to see who's online and streaming
 
+### 6. **Speaker Diarization Service** ⭐ NEW
+   - Detect "who spoke when" in meeting recordings and podcasts
+   - Identify speakers by matching against voice enrollment database
+   - Optional automatic transcription with speaker labels
+   - Multi-language support (language-agnostic diarization)
+   - Output formats: JSON, TXT, SRT, VTT subtitles
+   - See `Nemo-diarization/README.md` for detailed usage
+
 All services are accessible through both the web interface and RESTful API endpoints. See `API/API_DOCUMENTATION.md` for detailed API usage.
 
 ## Tech Stack
