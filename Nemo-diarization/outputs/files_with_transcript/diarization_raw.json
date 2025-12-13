@@ -1,0 +1,82 @@
+[
+  {
+    "start": 0.75,
+    "end": 18.0,
+    "speaker": "Speaker_3"
+  },
+  {
+    "start": 18.0,
+    "end": 18.75,
+    "speaker": "Speaker_5"
+  },
+  {
+    "start": 18.75,
+    "end": 30.0,
+    "speaker": "Speaker_0"
+  },
+  {
+    "start": 30.0,
+    "end": 30.75,
+    "speaker": "Speaker_7"
+  },
+  {
+    "start": 30.75,
+    "end": 36.0,
+    "speaker": "Speaker_8"
+  },
+  {
+    "start": 36.0,
+    "end": 37.5,
+    "speaker": "Speaker_6"
+  },
+  {
+    "start": 37.5,
+    "end": 40.5,
+    "speaker": "Speaker_0"
+  },
+  {
+    "start": 40.5,
+    "end": 52.5,
+    "speaker": "Speaker_3"
+  },
+  {
+    "start": 52.5,
+    "end": 54.0,
+    "speaker": "Speaker_1"
+  },
+  {
+    "start": 54.0,
+    "end": 63.0,
+    "speaker": "Speaker_8"
+  },
+  {
+    "start": 63.0,
+    "end": 74.25,
+    "speaker": "Speaker_2"
+  },
+  {
+    "start": 74.25,
+    "end": 75.75,
+    "speaker": "Speaker_4"
+  },
+  {
+    "start": 75.75,
+    "end": 79.5,
+    "speaker": "Speaker_3"
+  },
+  {
+    "start": 79.5,
+    "end": 81.75,
+    "speaker": "Speaker_4"
+  },
+  {
+    "start": 81.75,
+    "end": 84.75,
+    "speaker": "Speaker_3"
+  },
+  {
+    "start": 84.75,
+    "end": 85.59,
+    "speaker": "Speaker_4"
+  }
+]

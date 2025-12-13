@@ -1,6 +1,6 @@
 """
 Diarization Processor
-Uses SpeechBrain for speaker diarization (detecting "who spoke when")
+Uses NVIDIA NeMo for speaker diarization (detecting "who spoke when")
 """
 
 import os
@@ -9,19 +9,20 @@ import torchaudio
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
-from resemblyzer import VoiceEncoder, preprocess_wav
-from speechbrain.pretrained import SpeakerRecognition, EncoderClassifier
 import json
+from omegaconf import OmegaConf
+import tempfile
+import shutil
 
 
 class DiarizationProcessor:
     """
-    Performs speaker diarization using SpeechBrain
+    Performs speaker diarization using NVIDIA NeMo
     """
     
     def __init__(self, device: str = "cuda" if torch.cuda.is_available() else "cpu"):
         """
-        Initialize diarization processor
+        Initialize NeMo diarization processor
         
         Args:
             device: Device to run models on ('cuda' or 'cpu')
@@ -29,20 +30,18 @@ class DiarizationProcessor:
         self.device = device
         print(f"Using device: {self.device}")
         
-        # Set up HuggingFace token if available
-        hf_token_path = Path("hf_token.txt")
-        if hf_token_path.exists():
-            with open(hf_token_path, 'r') as f:
-                token = f.read().strip()
-                os.environ['HF_TOKEN'] = token
-                os.environ['HUGGING_FACE_HUB_TOKEN'] = token
-        
-        # Load SpeechBrain speaker recognition model
-        print("Loading SpeechBrain models...")
+        # Import NeMo modules
         try:
-            self.speaker_model = EncoderClassifier.from_hparams(
-                source="speechbrain/spkrec-ecapa-voxceleb",
-                savedir="Nemo-diarization/models/spkrec-ecapa-voxceleb",
+            from nemo.collections.asr.models import ClusteringDiarizer
+            self.ClusteringDiarizer = ClusteringDiarizer
+            print("✓ NeMo ASR imported successfully")
+        except ImportError:
+            raise ImportError(
+                "NVIDIA NeMo not installed. Please install with:\n"
+                "pip install nemo_toolkit[asr]"
+            )
+        
+        self.diarizer = None
                 run_opts={"device": device}
             )
         except Exception as e:
@@ -72,7 +71,11 @@ class DiarizationProcessor:
         Returns:
             Tuple of (embeddings list, timestamps list)
         """
-        # Load audio
+        # Get TRUE audio duration from original file
+        audio_info = torchaudio.info(audio_path)
+        audio_duration = audio_info.num_frames / audio_info.sample_rate
+        
+        # Load and resample audio for processing
         wav = preprocess_wav(audio_path)
         sample_rate = 16000  # Resemblyzer uses 16kHz
         
@@ -83,24 +86,28 @@ class DiarizationProcessor:
         embeddings = []
         timestamps = []
         
-        # Slide window through audio
-        for start in range(0, len(wav) - window_samples, hop_samples):
-            end = start + window_samples
+        # Slide window through audio - process entire file
+        start = 0
+        while start < len(wav):
+            end = min(start + window_samples, len(wav))
             segment = wav[start:end]
             
-            # Skip silent segments
-            if np.std(segment) < 0.01:
-                continue
+            # Pad if needed at the end
+            if len(segment) < window_samples:
+                segment = np.pad(segment, (0, window_samples - len(segment)), mode='constant')
             
-            # Extract embedding
+            # Extract embedding (don't skip silent segments to ensure full coverage)
             embedding = self.encoder.embed_utterance(segment)
             embeddings.append(embedding)
             
-            # Calculate timestamp (center of window)
+            # Use WINDOW CENTER for accurate boundary placement
+            # This represents the temporal center of the audio in this window
             timestamp = (start + window_samples // 2) / sample_rate
             timestamps.append(timestamp)
+            
+            start += hop_samples
         
-        return embeddings, timestamps
+        return embeddings, timestamps, audio_duration
     
     def cluster_speakers(
         self,
@@ -148,7 +155,7 @@ class DiarizationProcessor:
         
         labels = clustering.fit_predict(distance)
         
-        # Create segments
+        # Create segments with boundaries at the midpoint between window centers
         segments = []
         current_speaker = None
         segment_start = None
@@ -157,7 +164,7 @@ class DiarizationProcessor:
             speaker_id = f"Speaker_{label}"
             
             if speaker_id != current_speaker:
-                # End previous segment
+                # End previous segment at midpoint between consecutive window centers
                 if current_speaker is not None:
                     segments.append({
                         'start': segment_start,
@@ -168,21 +175,22 @@ class DiarizationProcessor:
                 # Start new segment
                 current_speaker = speaker_id
                 segment_start = timestamp
-        
-        # Add final segment
+
+        # Add final segment - will be updated with actual duration later
         if current_speaker is not None:
+            final_time = timestamps[-1] if len(timestamps) > 0 else segment_start
             segments.append({
                 'start': segment_start,
-                'end': timestamps[-1],
+                'end': final_time,
                 'speaker': current_speaker
             })
         
-        # Merge adjacent segments with same speaker
-        segments = self._merge_segments(segments)
+        # Merge only consecutive segments from the SAME speaker
+        segments = self._merge_segments(segments, min_gap=0.1)
         
         return segments
     
-    def _merge_segments(self, segments: List[Dict]) -> List[Dict]:
+    def _merge_segments(self, segments: List[Dict], min_gap: float = 0.1) -> List[Dict]:
         """Merge adjacent segments from the same speaker"""
         if not segments:
             return []
@@ -192,8 +200,9 @@ class DiarizationProcessor:
         for seg in segments[1:]:
             prev = merged[-1]
             
-            # Merge if same speaker and close in time
-            if seg['speaker'] == prev['speaker'] and seg['start'] - prev['end'] < 0.5:
+            # ONLY merge if SAME speaker and very close (< min_gap)
+            # This prevents merging different speakers but reduces fragmentation
+            if seg['speaker'] == prev['speaker'] and seg['start'] - prev['end'] < min_gap:
                 prev['end'] = seg['end']
             else:
                 merged.append(seg)
@@ -223,17 +232,22 @@ class DiarizationProcessor:
         
         # Extract embeddings
         print("Extracting speaker embeddings...")
-        embeddings, timestamps = self.extract_speaker_embeddings(
+        embeddings, timestamps, audio_duration = self.extract_speaker_embeddings(
             audio_path, window_size, hop_size
         )
         
         print(f"Extracted {len(embeddings)} embeddings")
+        print(f"Audio duration: {audio_duration:.2f}s")
         
         # Cluster speakers
         print("Clustering speakers...")
         segments = self.cluster_speakers(
             embeddings, timestamps, num_speakers
         )
+        
+        # Update final segment end time to match audio duration
+        if segments and len(segments) > 0:
+            segments[-1]['end'] = audio_duration
         
         print(f"✓ Found {len(set(s['speaker'] for s in segments))} speakers")
         print(f"✓ Generated {len(segments)} segments")

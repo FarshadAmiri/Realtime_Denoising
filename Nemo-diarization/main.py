@@ -20,7 +20,9 @@ def process_meeting_audio(
     output_transcriptions: bool = False,
     transcriptor_model_path: Optional[str] = None,
     num_speakers: Optional[int] = None,
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    window_size: float = 2.0,
+    hop_size: float = 1.0
 ) -> Dict:
     """
     Complete pipeline for speaker diarization and optional transcription
@@ -33,6 +35,8 @@ def process_meeting_audio(
         transcriptor_model_path: Path to custom Whisper model (optional)
         num_speakers: Expected number of speakers (optional, will auto-detect if None)
         output_dir: Directory to save output files (optional)
+        window_size: Analysis window size in seconds (default: 2.0)
+        hop_size: Hop size in seconds (default: 1.0)
     
     Returns:
         Dictionary containing:
@@ -87,7 +91,9 @@ def process_meeting_audio(
     diarization = DiarizationProcessor()
     diarization_segments = diarization.perform_diarization(
         meeting_audio_path,
-        num_speakers=num_speakers
+        num_speakers=num_speakers,
+        window_size=window_size,
+        hop_size=hop_size
     )
     
     # Save raw diarization
@@ -207,7 +213,9 @@ def process_meeting_audio(
 def quick_diarize(
     audio_path: str,
     database_path: str,
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    window_size: float = 2.0,
+    hop_size: float = 1.0
 ) -> Dict:
     """
     Quick diarization without transcription
@@ -216,6 +224,8 @@ def quick_diarize(
         audio_path: Path to audio file
         database_path: Path to speaker database
         output_dir: Output directory
+        window_size: Analysis window size in seconds (default: 2.0)
+        hop_size: Hop size in seconds (default: 1.0)
     
     Returns:
         Diarization results
@@ -224,7 +234,9 @@ def quick_diarize(
         meeting_audio_path=audio_path,
         voice_embeddings_database_path=database_path,
         output_transcriptions=False,
-        output_dir=output_dir
+        output_dir=output_dir,
+        window_size=window_size,
+        hop_size=hop_size
     )
 
 
